@@ -7,115 +7,101 @@
 <p lang="sa"><strong>योगः कर्मसु कौशलम्</strong></p>
 
 <p><em>“Yoga is skill in action.”</em><br>
-<sub><a href="https://github.com/gita/gita">Bhagavad Gita 2.50</a>, from the public-domain <code>gita/gita</code> dataset</sub></p>
+<sub><a href="https://github.com/gita/gita">Bhagavad Gita 2.50</a></sub></p>
 
-<p><strong>Engineering interpretation:</strong> Plan carefully, then carry that care into execution.</p>
-
-**A compact reasoning discipline that helps AI agents stay scoped, verify claims, and spend effort where risk requires it.**
+<p><strong>Plan carefully, then carry that care into execution.</strong></p>
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-69%20passing-brightgreen.svg)](bench/test_bench.py)
-[![Invariants](https://img.shields.io/badge/invariants-12%20enforced-brightgreen.svg)](bench/validate.py)
-[![Benchmark](https://img.shields.io/badge/benchmark-pilot%2C%20not%20proof-orange.svg)](#benchmark)
 
 </div>
 
-## What Sarathi does
+Coding agents rarely fail because they cannot write another line of code. They fail because they
+guess what a file contains, fix a test instead of the bug, wander into unrelated refactors, repeat
+an approach that already failed, or declare victory before running the checks.
 
-Sarathi is an installable skill for coding agents. It teaches one practical loop:
+Sarathi is a small skill that pushes an agent in the other direction. It keeps the task in view,
+asks for evidence, matches effort to risk, and verifies the result before making a claim.
 
-1. Keep the requested outcome explicit.
-2. Inspect evidence before prescribing a fix.
-3. Match effort to risk.
-4. Make the smallest root-cause change.
-5. Verify before claiming success.
+## What changes when Sarathi is active?
 
-It also tells an agent to change hypotheses after repeated failures, preserve tests and safety
-controls, avoid unrelated refactors, and keep final answers concise.
+Without Sarathi, an agent might see a failing permission test and suggest skipping it. With
+Sarathi, it treats the test as evidence, inspects the authorization path, fixes the behavior, and
+runs the relevant checks.
 
-Use it for long implementation tasks, uncertain repository work, repeated failures, security or
-payment code, and any situation where an agent might guess or stop too early. It is not a model,
-training dataset, application server, or religious assistant.
+The same idea applies elsewhere:
+
+- If the repository is available, read the code before prescribing a patch.
+- If the files are missing, say what needs to be inspected instead of inventing their contents.
+- If two attempts fail, stop repeating them and test a different hypothesis.
+- If the task touches payments, security, production, or user data, slow down and verify more.
+- If the question is simple, answer it simply.
+
+The full skill is only about 620 estimated tokens when invoked. It does not add a framework,
+runtime, or external service to your project.
 
 ## Install
 
-Claude Code:
+For Claude Code:
 
 ```bash
 claude plugin marketplace add ujjwalredd/sarathi
 claude plugin install sarathi@sarathi
 ```
 
-Local clone:
+To install from a local clone:
 
 ```bash
+git clone https://github.com/ujjwalredd/sarathi.git
+cd sarathi
 make install
 ```
 
-The marketplace command uses the real GitHub owner, `ujjwalredd`, not a placeholder organization.
+The published plugin is version `0.2.0`.
 
-## Why the Bhagavad Gita data is included
+## Why are there Bhagavad Gita references?
 
-The Gita is not used to train or fine-tune a model. Sarathi uses nine short references as optional
-memory cues for engineering failure modes. For example, `BG 2.47` points to focusing on the work
-instead of gaming its metric.
+They are memory cues, not training data and not religious instruction.
 
-The bundled source data serves three purposes:
+A short name such as `action-not-fruit (BG 2.47)` points to a longer engineering reminder: solve
+the real problem instead of optimizing the score that represents it. The installed skill uses nine
+of these cues.
 
-- It prevents Sanskrit and citations from being typed from memory.
-- It keeps literal summaries separate from this project's engineering interpretations.
-- It lets the fidelity experiment test whether a model resolves each reference correctly.
+The source data is bundled so citations are not typed from memory. Sanskrit, literal summaries,
+and the project's engineering readings are kept in separate fields in
+[`skills/sarathi/references/anchors.json`](skills/sarathi/references/anchors.json). The Sanskrit
+does not sit in the frequently loaded prompt.
 
-Exact text, provenance, literal summaries, and operational interpretations are bundled with the
-skill in [`skills/sarathi/references/anchors.json`](skills/sarathi/references/anchors.json). The
-frequently loaded skill prompt contains no Sanskrit.
+The Bhagavad Gita is living scripture for many people. Sarathi makes no claim to religious
+authority, and its engineering readings are clearly marked as interpretations created for this
+project. Verse text comes from the public-domain [`gita/gita`](https://github.com/gita/gita)
+dataset.
 
-## Benchmark
+## What did the benchmark show?
 
-### Latest exploratory pilot
+We ran a small comparison against no skill, Caveman, and Ponytail using Codex `gpt-5.5`. The run
+contained 14 synthetic tasks and one sample per task, for 56 isolated calls in total.
 
-The final local run used Codex CLI 0.142.3, `gpt-5.5`, medium reasoning, 14 synthetic tasks, one
-sample per task and arm, and 56 isolated calls. Every call ran in a fresh empty directory with user
-config and rules disabled.
+| Arm | Passed | Skill body | Mean answer tokens | Total tokens per pass |
+|---|---:|---:|---:|---:|
+| Control | 13/14 | 0 bytes | 394 | **15,619** |
+| Caveman | 13/14 | 4,774 bytes | 223 | 16,693 |
+| Ponytail | 13/14 | 5,700 bytes | **180** | 16,742 |
+| **Sarathi** | **14/14** | **2,473 bytes** | 242 | 17,074 |
 
-| Arm | Skill body | Passed | 95% Wilson | Mean output tokens | Total tokens per pass |
-|---|---:|---:|---:|---:|---:|
-| Control | 0 bytes | 13/14 | [68.5%, 98.7%] | 394 | **15,619** |
-| Caveman | 4,774 bytes | 13/14 | [68.5%, 98.7%] | 223 | 16,693 |
-| Ponytail | 5,700 bytes | 13/14 | [68.5%, 98.7%] | **180** | 16,742 |
-| **Sarathi** | **2,473 bytes** | **14/14** | [78.5%, 100.0%] | 242 | 17,074 |
+That is encouraging, but it is not a victory lap. Sarathi was the only arm to pass every task and
+its instructions were less than half the size of either competing skill. It also used more total
+tokens per successful answer.
 
-Sarathi has the highest point pass rate and the smallest instruction body among the three skills.
-Its body is 48.2% smaller than Caveman and 56.6% smaller than Ponytail.
+The measured pass-rate lead was 7.1 percentage points, with a 95% interval from `-15.2` to `+31.5`.
+The sample is too small to tell whether the lead is real. Codex did not report dollar cost either,
+so this run does not prove cost savings.
 
-This is not proof that Sarathi is better. Its `+7.1` percentage-point pass difference has a 95%
-Newcombe interval of `[-15.2, +31.5]`, which includes harm, no effect, and benefit. Sarathi also
-loses on total tokens per verified pass. Codex CLI did not report per-call dollar cost, so this run
-does not prove dollar savings.
+In plain English: the skill looks useful and compact, but it has not earned a universal “better”
+claim yet.
 
-The suite was inspected while the skill and scorer were improved. Treat this as an exploratory
-pilot. A credible superiority claim needs held-out executable tasks, hidden tests, independent task
-authors, multiple models, and enough samples to resolve the expected effect.
+## Run it yourself
 
-### What is compared
-
-| Arm | Content |
-|---|---|
-| A | no skill |
-| F | exact pinned Caveman body |
-| G | exact pinned Ponytail body |
-| H | exact deployed Sarathi body |
-
-Competitor commits and hashes are recorded in
-[`bench/vendor/provenance.json`](bench/vendor/provenance.json). Generated arms are built from
-tracked sources and are not committed.
-
-The separate A to E codebook ablation asks whether correct Gita references compress full English
-guidance better than labels or incorrect references. It is not used as the product comparison.
-
-### Reproduce
-
-Free checks:
+Free repository checks:
 
 ```bash
 make check
@@ -123,7 +109,7 @@ make check
 
 Current result: 69 unit tests and 12 repository invariants pass.
 
-Codex pilot:
+Product comparison through Codex:
 
 ```bash
 python bench/run.py \
@@ -134,7 +120,7 @@ python bench/run.py \
   --n 1
 ```
 
-Claude pilot:
+Product comparison through Claude:
 
 ```bash
 python bench/run.py \
@@ -145,35 +131,23 @@ python bench/run.py \
   --n 1
 ```
 
-Model calls cost money. Start with `--n 1`. Each run records model, CLI version, seed, task and
-prompt hashes, skill hash, usage, outputs, and confidence intervals under local `results/`.
+Model calls can cost money, so start with `--n 1`. Each run records its model, CLI version, seed,
+task hashes, prompt hashes, skill hash, outputs, usage, and confidence intervals in local
+`results/`.
 
-Raw runs and generated arms are intentionally ignored by Git. This keeps the public repository
-small and avoids publishing bulky model transcripts. The benchmark code, tasks, scorer, pinned
-competitor inputs, and summary above remain public and reproducible.
+Raw runs and generated prompt arms are ignored by Git. The repository keeps the benchmark code,
+tasks, scorer, and exact pinned competitor inputs, which are the pieces needed to reproduce a run.
+Competitor revisions and hashes live in
+[`bench/vendor/provenance.json`](bench/vendor/provenance.json).
 
-## Repository layout
+## What is in this repository?
 
-| Path | Purpose |
-|---|---|
-| `skills/sarathi/` | installable skill, Codex metadata, and sourced references |
-| `.claude-plugin/` | Claude Code marketplace metadata |
-| `bench/tasks/` | public reasoning and minimalism scenarios |
-| `bench/vendor/` | exact pinned competitor skill sources and provenance |
-| `bench/run.py` | isolated Claude and Codex benchmark driver |
-| `bench/analyze.py` | confidence intervals, usage summaries, and manifest checks |
-| `bench/validate.py` | repository and experiment integrity checks |
-
-## Respect for the source text
-
-The Bhagavad Gita is living scripture for many people. This project uses selected references as
-engineering mnemonics and labels that use as its own interpretation. It claims no religious
-authority and provides no spiritual, medical, legal, or financial advice.
-
-Verse text comes from the public-domain [`gita/gita`](https://github.com/gita/gita) dataset.
-In-copyright translations are not copied into this repository.
+- [`skills/sarathi/`](skills/sarathi/) contains the installable skill and its references.
+- [`bench/`](bench/) contains the benchmark runner, tasks, scorer, and pinned comparisons.
+- [`.claude-plugin/`](.claude-plugin/) contains the Claude Code marketplace metadata.
+- [`assets/banner.png`](assets/banner.png) is the banner shown above.
 
 ## License
 
-MIT. See [LICENSE](LICENSE). Vendored Caveman and Ponytail sources retain their exact upstream
-content, provenance, and required notices in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Sarathi is MIT licensed. See [LICENSE](LICENSE). Vendored Caveman and Ponytail sources retain their
+upstream text, provenance, and notices in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
