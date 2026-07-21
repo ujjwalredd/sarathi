@@ -38,11 +38,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      # The arms must be regenerable from anchors.json. If a hand edit crept
-      # into an arm file, B and C no longer differ only in encoding and the
-      # comparison is no longer reliable.
-      - name: Arms regenerate identically
+      # Generated arms are intentionally not committed. Build twice to prove
+      # deterministic reproduction from tracked source files.
+      - name: Arms regenerate deterministically
         run: |
-          python bench/build_arms.py
-          git diff --exit-code bench/arms/ || {
-            echo "arms drifted from anchors.json; regenerate them instead of editing by hand"; exit 1; }
+          python bench/build_arms.py --out /tmp/sarathi-arms-a
+          python bench/build_arms.py --out /tmp/sarathi-arms-b
+          diff -ru /tmp/sarathi-arms-a /tmp/sarathi-arms-b

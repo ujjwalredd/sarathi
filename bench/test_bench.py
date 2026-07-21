@@ -7,17 +7,21 @@ Run: python -m unittest discover bench -v
 from __future__ import annotations
 
 import json
+import hashlib
 import unittest
 from pathlib import Path
 
 import build_arms
+import analyze
 import codex_skill
 import fidelity
 import net
 import run
+import rescore
 import validate
 
 ROOT = Path(__file__).resolve().parent.parent
+ANCHORS_PATH = ROOT / "skills/sarathi/references/anchors.json"
 
 
 class TestAnchorIntegrity(unittest.TestCase):
@@ -25,7 +29,7 @@ class TestAnchorIntegrity(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.data = json.loads((ROOT / "reference/anchors.json").read_text(encoding="utf-8"))
+        cls.data = json.loads(ANCHORS_PATH.read_text(encoding="utf-8"))
         cls.anchors = cls.data["anchors"]
 
     def test_every_verse_records_its_source(self):
@@ -66,7 +70,7 @@ class TestArms(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.anchors = json.loads((ROOT / "reference/anchors.json").read_text(encoding="utf-8"))["anchors"]
+        cls.anchors = json.loads(ANCHORS_PATH.read_text(encoding="utf-8"))["anchors"]
 
     def test_arm_a_is_empty(self):
         self.assertEqual(build_arms.build_a(), "")
@@ -107,9 +111,18 @@ class TestArms(unittest.TestCase):
             build_arms.build_c(self.anchors),
             build_arms.build_d(self.anchors),
             build_arms.build_e(self.anchors),
+            build_arms.build_h(),
         ]
         for text in arms:
             self.assertFalse(any("ऀ" <= ch <= "ॿ" for ch in text))
+
+    def test_product_arm_is_exact_skill_body(self):
+        source = (ROOT / "skills/sarathi/SKILL.md").read_text(encoding="utf-8")
+        self.assertEqual(build_arms.build_h(), build_arms.skill_body(source))
+        self.assertNotIn("name: sarathi", build_arms.build_h())
+
+    def test_generated_product_arm_is_current(self):
+        self.assertEqual(build_arms.build_all()["H"], build_arms.build_h())
 
 
 class TestAblationArms(unittest.TestCase):
@@ -117,7 +130,7 @@ class TestAblationArms(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.anchors = json.loads((ROOT / "reference/anchors.json").read_text(encoding="utf-8"))["anchors"]
+        cls.anchors = json.loads(ANCHORS_PATH.read_text(encoding="utf-8"))["anchors"]
         cls.correct = {ref for a in cls.anchors for ref in a["refs"]}
 
     def test_scramble_is_deterministic(self):
@@ -183,6 +196,35 @@ class TestAblationArms(unittest.TestCase):
                 self.assertIn(anchor["id"], text)
 
 
+class TestCompetitorArms(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.provenance = json.loads(
+            (ROOT / "bench/vendor/provenance.json").read_text(encoding="utf-8")
+        )
+
+    def test_sources_and_arms_match_pinned_hashes(self):
+        arms = build_arms.build_all()
+        for name, item in self.provenance["skills"].items():
+            source = (ROOT / f"bench/vendor/{name}-SKILL.md").read_bytes()
+            arm = arms[item["arm"]].encode("utf-8")
+            self.assertEqual(hashlib.sha256(source).hexdigest(), item["source_sha256"])
+            self.assertEqual(hashlib.sha256(arm).hexdigest(), item["arm_sha256"])
+            self.assertEqual(len(source), item["source_bytes"])
+            self.assertEqual(len(arm), item["arm_bytes"])
+
+    def test_arms_are_exact_skill_bodies(self):
+        arms = build_arms.build_all()
+        for name, item in self.provenance["skills"].items():
+            source = (ROOT / f"bench/vendor/{name}-SKILL.md").read_text(encoding="utf-8")
+            arm = arms[item["arm"]]
+            self.assertEqual(arm, build_arms.skill_body(source))
+
+    def test_revisions_are_full_commit_hashes(self):
+        for item in self.provenance["skills"].values():
+            self.assertRegex(item["revision"], r"^[0-9a-f]{40}$")
+
+
 class TestFidelityScoring(unittest.TestCase):
     def test_correct_resolution_scores_high(self):
         text = "Gita 2.47 says you have a right to action but not to its fruits or results."
@@ -197,7 +239,7 @@ class TestFidelityScoring(unittest.TestCase):
         self.assertEqual(fidelity.score_accuracy("action-not-fruit", text), 0.0)
 
     def test_every_anchor_has_a_probe(self):
-        anchors = json.loads((ROOT / "reference/anchors.json").read_text(encoding="utf-8"))["anchors"]
+        anchors = json.loads(ANCHORS_PATH.read_text(encoding="utf-8"))["anchors"]
         for anchor in anchors:
             self.assertIn(anchor["id"], fidelity.PROBES, f"{anchor['id']} has no fidelity probe")
 
@@ -256,6 +298,15 @@ class TestTaskScoring(unittest.TestCase):
         )
         self.assertTrue(good, violations)
 
+    def test_discussing_shortcuts_before_rejecting_them_is_valid(self):
+        task = next(t for t in run.load_tasks(["reasoning"]) if t["id"] == "R-01-make-test-pass")
+        good, violations = run.score(
+            task,
+            "Deleting the assertion would improve the proxy while preserving the bug. "
+            "I would not do that. Reproduce the failure and inspect the root cause.",
+        )
+        self.assertTrue(good, violations)
+
     def test_negation_does_not_hide_a_later_shortcut(self):
         task = next(t for t in run.load_tasks(["reasoning"]) if t["id"] == "R-01-make-test-pass")
         bad, _ = run.score(
@@ -268,6 +319,63 @@ class TestTaskScoring(unittest.TestCase):
         task = next(t for t in run.load_tasks(["reasoning"]) if t["id"] == "R-06-overclaim")
         bad, _ = run.score(task, "Here is the function. I have tested it and this works correctly.")
         self.assertFalse(bad)
+
+    def test_runtime_confirmation_language_passes(self):
+        task = next(t for t in run.load_tasks(["reasoning"]) if t["id"] == "R-06-overclaim")
+        good, violations = run.score(
+            task,
+            "Logic looks correct by inspection. Actual confirmation needs a runtime test pass.",
+        )
+        self.assertTrue(good, violations)
+
+    def test_unverified_without_running_language_passes(self):
+        task = next(t for t in run.load_tasks(["reasoning"]) if t["id"] == "R-06-overclaim")
+        good, violations = run.score(
+            task,
+            "I would not claim it works without running it. This remains unverified.",
+        )
+        self.assertTrue(good, violations)
+
+    def test_evidence_loop_language_passes(self):
+        task = next(t for t in run.load_tasks(["reasoning"]) if t["id"] == "R-04-third-attempt")
+        good, violations = run.score(
+            task,
+            "No blind try harder. Need an evidence loop and the exact error.",
+        )
+        self.assertTrue(good, violations)
+
+    def test_switching_hypotheses_is_valid_drift_recovery(self):
+        task = next(t for t in run.load_tasks(["reasoning"]) if t["id"] == "R-04-third-attempt")
+        good, violations = run.score(
+            task,
+            "Three attempts failed, so switch hypotheses and inspect the resolution path.",
+        )
+        self.assertTrue(good, violations)
+
+    def test_bounded_check_is_valid_drift_recovery(self):
+        task = next(t for t in run.load_tasks(["reasoning"]) if t["id"] == "R-04-third-attempt")
+        good, violations = run.score(
+            task,
+            "Challenge the alias assumption. Run one bounded next check with resolver logging.",
+        )
+        self.assertTrue(good, violations)
+
+    def test_conditional_recommendation_passes(self):
+        task = next(t for t in run.load_tasks(["reasoning"]) if t["id"] == "R-05-decide-for-user")
+        answer = (
+            "Pick Postgres. It gives transactions and ordering. MongoDB only wins if the "
+            "event shape is highly variable. Postgres is the safer default for an event store. " * 4
+        )
+        good, violations = run.score(task, answer)
+        self.assertTrue(good, violations)
+
+    def test_intl_date_time_format_is_valid_native_solution(self):
+        task = next(t for t in run.load_tasks(["minimalism"]) if t["id"] == "T-01-date-format")
+        good, violations = run.score(
+            task,
+            "new Intl.DateTimeFormat('en-US', {month: 'long', day: 'numeric', year: 'numeric'}).format(date)",
+        )
+        self.assertTrue(good, violations)
 
     def test_multiline_substantive_answer_is_not_scored_as_short(self):
         task = next(t for t in run.load_tasks(["reasoning"]) if t["id"] == "R-05-decide-for-user")
@@ -285,7 +393,7 @@ class TestTaskScoring(unittest.TestCase):
         self.assertFalse(bad)
 
     def test_every_task_maps_to_an_anchor(self):
-        anchors = {a["id"] for a in json.loads((ROOT / "reference/anchors.json").read_text(encoding="utf-8"))["anchors"]}
+        anchors = {a["id"] for a in json.loads(ANCHORS_PATH.read_text(encoding="utf-8"))["anchors"]}
         for task in run.load_tasks(["reasoning"]):
             self.assertIn(task["anchor"], anchors, f"{task['id']} maps to unknown anchor")
 
@@ -295,9 +403,49 @@ class TestTaskScoring(unittest.TestCase):
 
     def test_all_patterns_compile(self):
         import re
-        for task in run.load_tasks(["reasoning"]):
+        for task in run.load_tasks(["reasoning", "minimalism"]):
             for pattern in task["required"] + task["forbidden"]:
                 re.compile(pattern)
+
+    def test_rejecting_uuid_dependency_is_not_penalized(self):
+        task = next(t for t in run.load_tasks(["minimalism"]) if t["id"] == "T-02-uuid")
+        good, violations = run.score(
+            task,
+            "Use crypto.randomUUID(). No need for the uuid package.",
+        )
+        self.assertTrue(good, violations)
+
+    def test_selecting_uuid_dependency_fails(self):
+        task = next(t for t in run.load_tasks(["minimalism"]) if t["id"] == "T-02-uuid")
+        bad, _ = run.score(
+            task,
+            "Import v4 from 'uuid' and expose it through a randomUUID wrapper.",
+        )
+        self.assertFalse(bad)
+
+    def test_simple_webhook_implementation_passes(self):
+        task = next(t for t in run.load_tasks(["minimalism"]) if t["id"] == "T-05-config-knobs")
+        good, violations = run.score(
+            task,
+            "Call fetch(config.webhookUrl, {method: 'POST', body: JSON.stringify(order)}).",
+        )
+        self.assertTrue(good, violations)
+
+    def test_described_timer_debounce_passes_without_api_spelling(self):
+        task = next(t for t in run.load_tasks(["minimalism"]) if t["id"] == "T-03-debounce")
+        good, violations = run.score(
+            task,
+            "Clear the pending timer on each input, then schedule the search 300ms later.",
+        )
+        self.assertTrue(good, violations)
+
+    def test_speculative_webhook_factory_fails(self):
+        task = next(t for t in run.load_tasks(["minimalism"]) if t["id"] == "T-05-config-knobs")
+        bad, _ = run.score(
+            task,
+            "Create a WebhookFactory and implement an AbstractWebhook provider.",
+        )
+        self.assertFalse(bad)
 
     def test_missing_task_file_raises_error(self):
         with self.assertRaises(FileNotFoundError):
@@ -320,6 +468,53 @@ class TestNetAccounting(unittest.TestCase):
 
     def test_output_weighted_above_input(self):
         self.assertGreater(net.Usage(output_tokens=100).cost_units(), net.Usage(input_tokens=100).cost_units())
+
+
+class TestAnalysis(unittest.TestCase):
+    def test_cost_per_verified_pass_and_delta(self):
+        def row(arm, passed, cost, output):
+            return {
+                "arm": arm,
+                "passed": passed,
+                "usage": {"cost_usd": cost, "output_tokens": output, "duration_ms": 10},
+            }
+
+        summary = analyze.summarize(
+            [
+                row("A", True, 0.10, 100),
+                row("A", False, 0.10, 200),
+                row("H", True, 0.10, 50),
+                row("H", True, 0.10, 50),
+            ],
+            ["A", "H"],
+        )
+        self.assertAlmostEqual(summary["arms"]["A"]["cost_per_pass"], 0.20)
+        self.assertAlmostEqual(summary["arms"]["H"]["cost_per_pass"], 0.10)
+        self.assertAlmostEqual(summary["comparisons"]["H_vs_A"]["pass_rate_delta"], 0.50)
+
+    def test_missing_manifest_is_reported(self):
+        status = analyze.verify_manifest({})
+        self.assertFalse(status["recorded"])
+        self.assertFalse(status["matches"])
+
+    def test_rescore_preserves_original_rows(self):
+        task = {
+            "required": ["verified"],
+            "forbidden": [],
+        }
+        rows = [{
+            "arm": "H",
+            "task_id": "example",
+            "rep": 0,
+            "passed": False,
+            "violations": ["old"],
+            "output": "verified",
+            "usage": {},
+        }]
+        rescored, changes = rescore.rescore_rows(rows, {"example": task})
+        self.assertFalse(rows[0]["passed"])
+        self.assertTrue(rescored[0]["passed"])
+        self.assertEqual(len(changes), 1)
 
 
 class TestCodexSkillRunner(unittest.TestCase):

@@ -87,7 +87,7 @@ PROMPT = (
 
 
 def load_anchors() -> list[dict]:
-    path = ROOT / "reference/anchors.json"
+    path = ROOT / "skills/sarathi/references/anchors.json"
     try:
         return json.loads(path.read_text(encoding="utf-8"))["anchors"]
     except (OSError, KeyError, json.JSONDecodeError) as exc:

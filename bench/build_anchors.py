@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build reference/anchors.json from the project's mappings and sourced verse data.
+"""Build the skill's anchors.json from sourced verse data and project mappings.
 
 The failure-mode mappings below were written for this project. The Sanskrit and
 transliteration come from a public-domain dataset, so the build never relies on
@@ -178,9 +178,13 @@ def build(index: dict[tuple[int, int], dict]) -> dict:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Build reference/anchors.json from a source dataset.")
+    parser = argparse.ArgumentParser(description="Build the bundled anchors.json from a source dataset.")
     parser.add_argument("--source", type=Path, default=Path("/tmp/gita_verse.json"))
-    parser.add_argument("--out", type=Path, default=Path(__file__).parent.parent / "reference/anchors.json")
+    parser.add_argument(
+        "--out",
+        type=Path,
+        default=Path(__file__).parent.parent / "skills/sarathi/references/anchors.json",
+    )
     args = parser.parse_args()
 
     index = load_source(args.source)

@@ -8,10 +8,13 @@ drift away from its own argument. Run in CI and before any release.
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import re
 import sys
 from pathlib import Path
+
+import build_arms
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -28,12 +31,17 @@ def _skill_path() -> Path:
     return ROOT / "skills/sarathi/SKILL.md"
 
 
+def _anchors_path() -> Path:
+    return ROOT / "skills/sarathi/references/anchors.json"
+
+
 def check_json_parses() -> list[str]:
     errors = []
     targets = [
         ROOT / ".claude-plugin/plugin.json",
         ROOT / ".claude-plugin/marketplace.json",
-        ROOT / "reference/anchors.json",
+        _anchors_path(),
+        ROOT / "bench/vendor/provenance.json",
     ]
     targets += sorted((ROOT / "bench/tasks").glob("*.json"))
     for path in targets:
@@ -54,9 +62,9 @@ def check_every_verse_has_a_source() -> list[str]:
     text. Citation hallucination runs 13-21% even under retrieval grounding, so
     hand-typed verses are the one thing that cannot be allowed.
     """
-    path = ROOT / "reference/anchors.json"
+    path = _anchors_path()
     if not path.exists():
-        return ["reference/anchors.json is missing; run bench/build_anchors.py"]
+        return ["skills/sarathi/references/anchors.json is missing; run bench/build_anchors.py"]
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
@@ -80,7 +88,7 @@ def check_no_chapter_13() -> list[str]:
     A `BG 13.x` pointer is therefore ambiguous, and an ambiguous pointer is
     exactly the failure this project exists to measure.
     """
-    path = ROOT / "reference/anchors.json"
+    path = _anchors_path()
     if not path.exists():
         return []
     data = json.loads(path.read_text(encoding="utf-8"))
@@ -94,7 +102,7 @@ def check_no_chapter_13() -> list[str]:
 
 def check_every_anchor_maps_to_a_failure_mode() -> list[str]:
     """Require every anchor to address a documented failure mode."""
-    path = ROOT / "reference/anchors.json"
+    path = _anchors_path()
     if not path.exists():
         return []
     data = json.loads(path.read_text(encoding="utf-8"))
@@ -116,12 +124,19 @@ def check_no_devanagari_in_hot_path() -> list[str]:
     reference/, which loads on demand.
     """
     errors = []
-    for path in [_skill_path(), *sorted((ROOT / "bench/arms").glob("*.txt"))]:
+    for path in [_skill_path()]:
         if not path.exists():
             continue
         text = path.read_text(encoding="utf-8")
         if DEVANAGARI.search(text):
             errors.append(f"{path.relative_to(ROOT)}: contains Devanagari that belongs in reference/")
+    try:
+        arms = build_arms.build_all()
+    except (RuntimeError, SystemExit) as exc:
+        return errors + [f"cannot build benchmark arms: {exc}"]
+    for name, text in arms.items():
+        if DEVANAGARI.search(text):
+            errors.append(f"generated arm {name}: contains Devanagari that belongs in references/")
     return errors
 
 
@@ -159,6 +174,11 @@ def check_no_em_dash_in_authored_text() -> list[str]:
 
     Saved benchmark responses under results/ are evidence produced by models, not
     project prose, so they remain verbatim.
+
+    Vendored competitor arms are exempt for the same reason and a stronger one:
+    arms F and G are third-party prompts reproduced byte for byte. Editing them
+    to satisfy a house style rule would silently change what the benchmark is
+    comparing against, which matters far more than punctuation consistency.
     """
     suffixes = {".md", ".py", ".json", ".yml", ".yaml", ".cff", ".txt"}
     errors = []
@@ -167,6 +187,10 @@ def check_no_em_dash_in_authored_text() -> list[str]:
             continue
         relative = path.relative_to(ROOT)
         if relative.parts[0] in {".git", "results"} or "__pycache__" in relative.parts:
+            continue
+        if relative.parts[:2] == ("bench", "arms"):
+            continue
+        if relative.parts[:2] == ("bench", "vendor"):
             continue
         if path.name != "Makefile" and path.suffix not in suffixes:
             continue
@@ -181,23 +205,21 @@ def check_arms_differ_only_in_encoding() -> list[str]:
     If B mentions a principle C omits, a difference in result could be content
     rather than encoding, which would make the comparison unclear.
     """
-    arms = ROOT / "bench/arms"
-    anchors_path = ROOT / "reference/anchors.json"
-    if not (arms / "B.txt").exists() or not (arms / "C.txt").exists():
-        return ["benchmark arms are missing; run bench/build_arms.py"]
+    anchors_path = _anchors_path()
     if not anchors_path.exists():
         return []
 
     data = json.loads(anchors_path.read_text(encoding="utf-8"))
     ids = [a["id"] for a in data.get("anchors", [])]
-    c_text = (arms / "C.txt").read_text(encoding="utf-8")
+    arms = build_arms.build_all()
+    c_text = arms["C"]
 
     errors = []
     for anchor_id in ids:
         if anchor_id not in c_text:
             errors.append(f"arm C missing anchor {anchor_id}")
 
-    b_text = (arms / "B.txt").read_text(encoding="utf-8")
+    b_text = arms["B"]
     if DEVANAGARI.search(b_text) or re.search(r"\bBG \d", b_text):
         errors.append("arm B contains verse references, so it cannot isolate the full-text condition")
     return errors
@@ -209,22 +231,17 @@ def check_ablation_arms() -> list[str]:
     D must carry only wrong references (else it is a second copy of C), and E
     must carry none (else it does not isolate the label).
     """
-    arms = ROOT / "bench/arms"
-    anchors_path = ROOT / "reference/anchors.json"
+    anchors_path = _anchors_path()
     if not anchors_path.exists():
         return []
 
     errors = []
-    for name in ("D", "E"):
-        if not (arms / f"{name}.txt").exists():
-            errors.append(f"arm {name} is missing; run bench/build_arms.py")
-    if errors:
-        return errors
+    arms = build_arms.build_all()
 
     data = json.loads(anchors_path.read_text(encoding="utf-8"))
     correct = {ref for a in data["anchors"] for ref in a["refs"]}
 
-    d_text = (arms / "D.txt").read_text(encoding="utf-8")
+    d_text = arms["D"]
     d_refs = set(re.findall(r"BG \d+\.\d+", d_text))
     overlap = d_refs & correct
     if overlap:
@@ -234,12 +251,12 @@ def check_ablation_arms() -> list[str]:
     if any(r.startswith("BG 13.") for r in d_refs):
         errors.append("arm D uses chapter 13, which is recension-ambiguous")
 
-    e_text = (arms / "E.txt").read_text(encoding="utf-8")
+    e_text = arms["E"]
     if re.search(r"\bBG \d", e_text):
         errors.append("arm E contains references, so it does not isolate the label alone")
 
     # C and D must cost the same, or the comparison measures length not correctness.
-    c_len = len((arms / "C.txt").read_text(encoding="utf-8"))
+    c_len = len(arms["C"])
     d_len = len(d_text)
     if c_len and abs(c_len - d_len) / c_len > 0.05:
         errors.append(f"arms C ({c_len}) and D ({d_len}) differ by more than 5%, which weakens the comparison")
@@ -249,7 +266,7 @@ def check_ablation_arms() -> list[str]:
 
 def check_fidelity_probes_cover_anchors() -> list[str]:
     """Every anchor needs a probe, or its reliability is untested."""
-    anchors_path = ROOT / "reference/anchors.json"
+    anchors_path = _anchors_path()
     probe_path = ROOT / "bench/fidelity.py"
     if not anchors_path.exists() or not probe_path.exists():
         return []
@@ -260,6 +277,92 @@ def check_fidelity_probes_cover_anchors() -> list[str]:
         for a in data.get("anchors", [])
         if f'"{a["id"]}"' not in probes
     ]
+
+
+def check_product_and_competitor_arms() -> list[str]:
+    """Product arm must be current and competitor arms must match pinned sources."""
+    errors = []
+    skill_path = _skill_path()
+    try:
+        arms = build_arms.build_all()
+    except (RuntimeError, SystemExit) as exc:
+        return [f"cannot build benchmark arms: {exc}"]
+    if not skill_path.exists():
+        errors.append("product skill is missing")
+    else:
+        parts = skill_path.read_text(encoding="utf-8").split("---", 2)
+        if len(parts) != 3:
+            errors.append("SKILL.md has invalid frontmatter")
+        elif arms.get("H") != parts[2].lstrip("\n"):
+            errors.append("generated arm H does not match deployed Sarathi body")
+
+    provenance_path = ROOT / "bench/vendor/provenance.json"
+    if not provenance_path.exists():
+        return errors + ["competitor provenance is missing; run bench/vendor_competitors.py"]
+    try:
+        provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        return errors + [f"competitor provenance: {exc}"]
+
+    for name, item in provenance.get("skills", {}).items():
+        source_path = ROOT / f"bench/vendor/{name}-SKILL.md"
+        arm_name = item.get("arm", "?")
+        if not source_path.exists() or arm_name not in arms:
+            errors.append(f"{name}: vendored source or generated arm is missing")
+            continue
+        source = source_path.read_bytes()
+        arm = arms[arm_name].encode("utf-8")
+        source_hash = hashlib.sha256(source).hexdigest()
+        arm_hash = hashlib.sha256(arm).hexdigest()
+        if source_hash != item.get("source_sha256"):
+            errors.append(f"{name}: source SHA does not match provenance")
+        if arm_hash != item.get("arm_sha256"):
+            errors.append(f"{name}: arm SHA does not match provenance")
+        parts = source.decode("utf-8").split("---", 2)
+        if len(parts) != 3 or arm.decode("utf-8") != parts[2].lstrip("\n"):
+            errors.append(f"{name}: benchmark arm is not exact post-frontmatter body")
+    return errors
+
+
+def check_plugin_packaging() -> list[str]:
+    """Keep Claude, marketplace, citation, and Codex metadata synchronized."""
+    errors = []
+    plugin_path = ROOT / ".claude-plugin/plugin.json"
+    marketplace_path = ROOT / ".claude-plugin/marketplace.json"
+    citation_path = ROOT / "CITATION.cff"
+    codex_path = ROOT / "skills/sarathi/agents/openai.yaml"
+    for path in (plugin_path, marketplace_path, citation_path, codex_path):
+        if not path.is_file():
+            errors.append(f"{path.relative_to(ROOT)}: missing")
+    if errors:
+        return errors
+
+    plugin = json.loads(plugin_path.read_text(encoding="utf-8"))
+    marketplace = json.loads(marketplace_path.read_text(encoding="utf-8"))
+    entries = marketplace.get("plugins", [])
+    if len(entries) != 1:
+        errors.append("marketplace must contain exactly one Sarathi plugin entry")
+        return errors
+    entry = entries[0]
+    versions = {
+        plugin.get("version"),
+        marketplace.get("metadata", {}).get("version"),
+        entry.get("version"),
+    }
+    if len(versions) != 1 or None in versions:
+        errors.append(f"plugin versions disagree: {sorted(str(v) for v in versions)}")
+    if plugin.get("name") != "sarathi" or entry.get("name") != "sarathi":
+        errors.append("Claude plugin and marketplace names must both be sarathi")
+
+    citation = citation_path.read_text(encoding="utf-8")
+    version = plugin.get("version")
+    if version and f"version: {version}" not in citation:
+        errors.append("CITATION.cff version does not match plugin.json")
+    codex = codex_path.read_text(encoding="utf-8")
+    for required in ('display_name: "Sarathi"', "$sarathi"):
+        if required not in codex:
+            errors.append(f"skills/sarathi/agents/openai.yaml missing {required}")
+    return errors
 
 
 CHECKS = [
@@ -273,6 +376,8 @@ CHECKS = [
     ("arms differ only in encoding", check_arms_differ_only_in_encoding),
     ("control arms are valid", check_ablation_arms),
     ("fidelity probes cover anchors", check_fidelity_probes_cover_anchors),
+    ("product and competitor arms are pinned", check_product_and_competitor_arms),
+    ("plugin packaging is synchronized", check_plugin_packaging),
 ]
 
 

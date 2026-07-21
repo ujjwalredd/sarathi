@@ -6,8 +6,8 @@ authors:
   - name: "sarathi contributors"
 repository-code: "https://github.com/ujjwalredd/sarathi"
 license: MIT
-version: 0.1.0
-date-released: 2026-07-20
+version: 0.2.0
+date-released: 2026-07-21
 keywords:
   - large language models
   - agent reasoning
@@ -17,5 +17,5 @@ abstract: >-
   Sarathi is a reasoning checklist for AI agents and a benchmark for testing compact
   memory cues. It maps nine Bhagavad Gita references to practical agent failure modes
   such as reward hacking, goal drift, overthinking, and overconfident claims. A five-arm
-  experiment compares full English guidance, correct references, incorrect references,
-  labels without references, and a no-guidance control.
+  ablation tests the reference mechanism, while a separate product benchmark compares the
+  exact deployed skill with pinned competitor skill bodies and a no-guidance control.

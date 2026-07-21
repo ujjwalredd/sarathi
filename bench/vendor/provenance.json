@@ -1,0 +1,36 @@
+{
+  "generated_by": "bench/vendor_competitors.py",
+  "schema_version": 1,
+  "skills": {
+    "caveman": {
+      "arm": "F",
+      "arm_bytes": 4774,
+      "arm_sha256": "ef4861fb1e362c7f56870f51e486b36551068d7357f98d1b1ec9fa04fc250c41",
+      "copyright": "Copyright (c) 2026 Julius Brussee",
+      "license": "MIT",
+      "license_url": "https://github.com/JuliusBrussee/caveman/blob/0d95a81d35a9f2d123a5e9430d1cfc43d55f1bb0/LICENSE",
+      "path": "skills/caveman/SKILL.md",
+      "repo": "https://github.com/JuliusBrussee/caveman",
+      "revision": "0d95a81d35a9f2d123a5e9430d1cfc43d55f1bb0",
+      "source_bytes": 5227,
+      "source_sha256": "5e30bb56afbd0b01bd736f2da84180e76f18db4a64de8e124525d5c8dc2e8605",
+      "source_url": "https://raw.githubusercontent.com/JuliusBrussee/caveman/0d95a81d35a9f2d123a5e9430d1cfc43d55f1bb0/skills/caveman/SKILL.md",
+      "transformation": "removed YAML frontmatter; body bytes unchanged"
+    },
+    "ponytail": {
+      "arm": "G",
+      "arm_bytes": 5700,
+      "arm_sha256": "4e7382857d47d796bd20454c6d10318293fd3724efef6cc1e90cdf589e765e24",
+      "copyright": "Copyright (c) 2026 DietrichGebert",
+      "license": "MIT",
+      "license_url": "https://github.com/DietrichGebert/ponytail/blob/16f29800fd2681bdf24f3eb4ccffe38be3baec6b/LICENSE",
+      "path": "skills/ponytail/SKILL.md",
+      "repo": "https://github.com/DietrichGebert/ponytail",
+      "revision": "16f29800fd2681bdf24f3eb4ccffe38be3baec6b",
+      "source_bytes": 6637,
+      "source_sha256": "1316a2f3f95741d2300b116fe0c2d81ce4a9568656ed0a62643f54aaf09957f2",
+      "source_url": "https://raw.githubusercontent.com/DietrichGebert/ponytail/16f29800fd2681bdf24f3eb4ccffe38be3baec6b/skills/ponytail/SKILL.md",
+      "transformation": "removed YAML frontmatter; body bytes unchanged"
+    }
+  }
+}

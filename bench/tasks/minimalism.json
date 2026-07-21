@@ -1,0 +1,91 @@
+{
+  "_comment": [
+    "Tasks where minimalism is correct. These are the cases the category advertises:",
+    "an agent left alone will over-build them. A skill should win here.",
+    "",
+    "Scoring: 'forbidden' patterns must NOT appear (case-insensitive regex).",
+    "'required' patterns must appear. Both are checked against the final diff."
+  ],
+  "tasks": [
+    {
+      "id": "T-01-date-format",
+      "category": "trap",
+      "prompt": "Format a JS Date as 'March 5, 2026' for display in the UI.",
+      "forbidden": [
+        "(?:(?:npm|pnpm|yarn).{0,20}(?:install|add)|(?:import|require)).{0,30}(?:moment|date-fns|dayjs)",
+        "function pad\\("
+      ],
+      "required": [
+        "toLocaleDateString|Intl\\.DateTimeFormat"
+      ],
+      "note": "Intl is native. Reaching for a dependency is the failure.",
+      "anchor": "minimalism"
+    },
+    {
+      "id": "T-02-uuid",
+      "category": "trap",
+      "prompt": "Generate a unique id for each new record created in this Node service.",
+      "forbidden": [
+        "(?:(?:npm|pnpm|yarn).{0,20}(?:install|add).{0,20}\\b(?:uuid|nanoid)\\b|(?:from|require\\().{0,30}['\"](?:uuid|nanoid)['\"])",
+        "(?:use|choose).{0,20}Math\\.random"
+      ],
+      "required": [
+        "randomUUID"
+      ],
+      "note": "crypto.randomUUID is stdlib. Math.random is also a correctness failure.",
+      "anchor": "minimalism"
+    },
+    {
+      "id": "T-03-debounce",
+      "category": "trap",
+      "prompt": "Debounce this search input so it only fires 300ms after typing stops.",
+      "forbidden": [
+        "(?:(?:npm|pnpm|yarn).{0,20}(?:install|add).{0,20}\\b(?:lodash|underscore)\\b|(?:from|require\\().{0,30}['\"](?:lodash|underscore)['\"])"
+      ],
+      "required": [
+        "setTimeout|schedule.{0,30}(?:timer|search)|timer.{0,30}300",
+        "clearTimeout|clear.{0,20}(?:timer|timeout)|cancel.{0,30}(?:timer|timeout)"
+      ],
+      "note": "Six lines. Pulling lodash for one function is the failure.",
+      "anchor": "minimalism"
+    },
+    {
+      "id": "T-04-deep-clone",
+      "category": "trap",
+      "prompt": "Deep clone this config object before mutating it.",
+      "forbidden": [
+        "(?:(?:npm|pnpm|yarn).{0,20}(?:install|add).{0,20}\\blodash\\b|(?:from|require\\().{0,30}['\"]lodash['\"])",
+        "(?:use|choose|return).{0,30}JSON\\.parse\\(JSON\\.stringify"
+      ],
+      "required": [
+        "structuredClone"
+      ],
+      "note": "structuredClone is native and handles cycles; the JSON round-trip does not.",
+      "anchor": "minimalism"
+    },
+    {
+      "id": "T-05-config-knobs",
+      "category": "trap",
+      "prompt": "Add a function that sends a webhook to the configured URL when an order ships.",
+      "forbidden": [
+        "(?:create|add|define|use|implement).{0,30}(?:retryStrategy|AbstractWebhook|WebhookFactory|interface .*Provider)"
+      ],
+      "required": [],
+      "note": "Speculative generality check. One caller, one implementation. No factory.",
+      "anchor": "minimalism"
+    },
+    {
+      "id": "T-06-css-truncate",
+      "category": "trap",
+      "prompt": "Truncate this card title to one line with an ellipsis when it overflows.",
+      "forbidden": [
+        "(?:add|use|implement).{0,20}(?:useEffect|measureText|substring|slice\\()"
+      ],
+      "required": [
+        "text-overflow"
+      ],
+      "note": "CSS ships this. Measuring in JS is the over-build.",
+      "anchor": "minimalism"
+    }
+  ]
+}

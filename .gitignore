@@ -1,6 +1,8 @@
-# Benchmark artifacts. Published results belong in results/ with the model id
-# recorded; raw runs are local and can be large.
+# Generated benchmark data stays local. Public claims belong in README with the
+# exact command, model, sample size, and limitations.
+results/
 runs/
+bench/arms/*.txt
 
 # Python
 __pycache__/

@@ -1,4 +1,4 @@
-.PHONY: help build test validate check pilot bench fidelity codex-baseline codex-auto codex-explicit install uninstall clean all
+.PHONY: help build vendor test validate check pilot bench compare compare-codex fidelity codex-baseline codex-auto codex-explicit install uninstall clean all
 
 # Stdlib only, by design: a benchmark that is hard to install is a benchmark
 # nobody re-runs, and re-running is the whole point of this repo.
@@ -9,7 +9,8 @@ N ?= 1
 help:
 	@echo "sarathi make targets"
 	@echo ""
-	@echo "  build       regenerate reference/anchors.json and all five arms"
+	@echo "  build       regenerate bundled references and all local benchmark arms"
+	@echo "  vendor      refresh pinned Caveman and Ponytail source snapshots"
 	@echo "  test        run the unit suite (no API calls, no cost)"
 	@echo "  validate    check repo invariants (no API calls, no cost)"
 	@echo "  check       test + validate. run this before every commit"
@@ -17,7 +18,9 @@ help:
 	@echo "  COSTS REAL MONEY: each call starts a full model session"
 	@echo "  fidelity    do the verse pointers resolve?  (9 x N calls)"
 	@echo "  pilot       fidelity N=3 + all five arms N=1 (~67 calls)"
-	@echo "  bench       full run, set N=5 or higher     (40 x N calls)"
+	@echo "  bench       codebook ablation A-E           (40 x N calls)"
+	@echo "  compare     Claude: control, competitors, deployed Sarathi"
+	@echo "  compare-codex  same comparison through Codex"
 	@echo "  codex-baseline  installed-skill control; run before installing Sarathi"
 	@echo "  codex-auto      installed skill with normal automatic routing"
 	@echo "  codex-explicit  installed skill explicitly requested in every prompt"
@@ -33,6 +36,9 @@ build:
 		https://raw.githubusercontent.com/gita/gita/main/data/verse.json
 	$(PY) bench/build_anchors.py --source /tmp/gita_verse.json
 	$(PY) bench/build_arms.py
+
+vendor:
+	$(PY) bench/vendor_competitors.py
 
 test:
 	$(PY) -m unittest discover bench -v
@@ -51,6 +57,13 @@ pilot:
 
 bench:
 	$(PY) bench/run.py --arms A B C D E --n $(N) --jobs $(JOBS)
+
+compare:
+	$(PY) bench/run.py --arms A F G H --tasks reasoning minimalism --n $(N) --jobs $(JOBS)
+
+compare-codex:
+	$(PY) bench/run.py --backend codex --model gpt-5.5 --arms A F G H \
+		--tasks reasoning minimalism --n $(N) --jobs $(JOBS)
 
 codex-baseline:
 	$(PY) bench/codex_skill.py --condition baseline --expect-skill absent --n $(N) --jobs $(JOBS)
@@ -72,6 +85,6 @@ uninstall:
 clean:
 	find . -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null || true
 	find . -name '.DS_Store' -delete 2>/dev/null || true
-	@echo "note: results/ is kept because published numbers must stay reproducible"
+	rm -rf bench/arms results
 
 all: build check

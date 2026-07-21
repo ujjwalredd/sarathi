@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate five comparable benchmark prompts from reference/anchors.json.
+"""Generate the codebook ablation and deployed Sarathi benchmark prompts.
 
 The experiment asks whether a short verse reference can carry the same practical
 guidance as a full English explanation. Generating every condition from one file
@@ -12,6 +12,10 @@ The five conditions are:
     arm C   label + correct `BG x.y`         the principle, as a pointer
     arm D   label + incorrect `BG x.y`       control: does correctness matter?
     arm E   label alone, no reference        control: does the pointer matter?
+
+Arm H is separate from that controlled ablation. It contains the body of the
+actual installed Sarathi skill and is the only Sarathi arm that should be used
+for product comparisons against vendored competitor skill bodies F and G.
 
 The two control conditions answer questions that A, B, and C cannot answer alone.
 The label may carry the idea without the verse, and a reference may influence the
@@ -30,12 +34,17 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import random
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+SKILL_PATH = ROOT / "skills/sarathi/SKILL.md"
+ANCHORS_PATH = ROOT / "skills/sarathi/references/anchors.json"
+VENDOR_DIR = ROOT / "bench/vendor"
+PROVENANCE_PATH = VENDOR_DIR / "provenance.json"
 
 PREAMBLE = (
     "Use the following reasoning checklist while answering this task. "
@@ -53,9 +62,8 @@ CHECKPOINTS = [
 
 
 def load_anchors() -> list[dict]:
-    path = ROOT / "reference/anchors.json"
     try:
-        return json.loads(path.read_text(encoding="utf-8"))["anchors"]
+        return json.loads(ANCHORS_PATH.read_text(encoding="utf-8"))["anchors"]
     except (OSError, KeyError, json.JSONDecodeError) as exc:
         print(f"error: cannot load anchors.json: {exc}", file=sys.stderr)
         print("hint: run bench/build_anchors.py first", file=sys.stderr)
@@ -165,6 +173,69 @@ def build_e(anchors: list[dict]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def skill_body(text: str) -> str:
+    """Return body loaded after skill routing, excluding YAML metadata."""
+    if not text.startswith("---\n"):
+        raise ValueError("skill is missing opening YAML frontmatter")
+    parts = text.split("---", 2)
+    if len(parts) != 3:
+        raise ValueError("skill has unterminated YAML frontmatter")
+    body = parts[2].lstrip("\n")
+    if not body.strip():
+        raise ValueError("skill body is empty")
+    return body
+
+
+def build_h() -> str:
+    """Build the product arm from the exact deployed Sarathi skill body."""
+    try:
+        return skill_body(SKILL_PATH.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise RuntimeError(f"cannot read {SKILL_PATH}: {exc}") from exc
+
+
+def build_vendor_arms() -> dict[str, str]:
+    """Build competitor arms from exact pinned source snapshots."""
+    try:
+        provenance = json.loads(PROVENANCE_PATH.read_text(encoding="utf-8"))
+    except (OSError, KeyError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"cannot load competitor provenance: {exc}") from exc
+
+    arms = {}
+    for name, item in provenance.get("skills", {}).items():
+        source_path = VENDOR_DIR / f"{name}-SKILL.md"
+        try:
+            source = source_path.read_bytes()
+            if hashlib.sha256(source).hexdigest() != item["source_sha256"]:
+                raise ValueError("source SHA-256 does not match provenance")
+            if len(source) != item["source_bytes"]:
+                raise ValueError("source size does not match provenance")
+            body = skill_body(source.decode("utf-8"))
+            body_bytes = body.encode("utf-8")
+            if hashlib.sha256(body_bytes).hexdigest() != item["arm_sha256"]:
+                raise ValueError("derived arm SHA-256 does not match provenance")
+            if len(body_bytes) != item["arm_bytes"]:
+                raise ValueError("derived arm size does not match provenance")
+            arms[item["arm"]] = body
+        except (OSError, KeyError, ValueError) as exc:
+            raise RuntimeError(f"cannot build competitor arm for {name}: {exc}") from exc
+    return arms
+
+
+def build_all() -> dict[str, str]:
+    """Render every arm from tracked source files without network access."""
+    anchors = load_anchors()
+    return {
+        "A": build_a(),
+        "B": build_b(anchors),
+        "C": build_c(anchors),
+        "D": build_d(anchors),
+        "E": build_e(anchors),
+        **build_vendor_arms(),
+        "H": build_h(),
+    }
+
+
 def estimate_tokens(text: str) -> int:
     """Rough char/4 heuristic. Real counts come from net.py against session logs.
 
@@ -179,20 +250,12 @@ def main() -> int:
     parser.add_argument("--out", type=Path, default=ROOT / "bench/arms")
     args = parser.parse_args()
 
-    anchors = load_anchors()
     args.out.mkdir(parents=True, exist_ok=True)
-
-    arms = {
-        "A": build_a(),
-        "B": build_b(anchors),
-        "C": build_c(anchors),
-        "D": build_d(anchors),
-        "E": build_e(anchors),
-    }
+    arms = build_all()
     for name, text in arms.items():
         (args.out / f"{name}.txt").write_text(text, encoding="utf-8")
 
-    print(f"  {len(anchors)} anchors → {len(arms)} arms in {args.out}\n")
+    print(f"  {len(load_anchors())} anchors → {len(arms)} arms in {args.out}\n")
     print(f"  {'arm':<6}{'chars':>8}{'~tokens':>10}   content")
     print("  " + "─" * 62)
     labels = {
@@ -201,6 +264,9 @@ def main() -> int:
         "C": "label + correct reference",
         "D": "label + incorrect reference (control)",
         "E": "label only, no reference (control)",
+        "F": "pinned Caveman skill body",
+        "G": "pinned Ponytail skill body",
+        "H": "deployed Sarathi skill body",
     }
     for name, text in arms.items():
         print(f"  {name:<6}{len(text):>8}{estimate_tokens(text):>10}   {labels[name]}")

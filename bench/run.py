@@ -26,7 +26,9 @@ from __future__ import annotations
 import argparse
 import collections
 import concurrent.futures
+import hashlib
 import json
+import random
 import re
 import shutil
 import statistics
@@ -34,13 +36,16 @@ import subprocess
 import sys
 import tempfile
 import time
+
+import analyze
+import build_arms
+import stats
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
 
 ROOT = Path(__file__).resolve().parent.parent
 TASKS_DIR = ROOT / "bench/tasks"
-ARMS_DIR = ROOT / "bench/arms"
 SCENARIO_PREAMBLE = (
     "Treat the following as a hypothetical engineering decision scenario. "
     "No project files are available. Do not inspect a workspace or run tools; "
@@ -76,10 +81,11 @@ def load_tasks(names: Sequence[str]) -> list[dict]:
 
 
 def load_arm(arm: str) -> str:
-    path = ARMS_DIR / f"{arm}.txt"
-    if not path.exists():
-        raise FileNotFoundError(f"arm {arm} is missing; run bench/build_arms.py")
-    return path.read_text(encoding="utf-8")
+    arms = build_arms.build_all()
+    try:
+        return arms[arm]
+    except KeyError as exc:
+        raise ValueError(f"unknown arm: {arm}") from exc
 
 
 def score(task: dict, output: str) -> tuple[bool, list[str]]:
@@ -99,9 +105,16 @@ def score(task: dict, output: str) -> tuple[bool, list[str]]:
             negated_before = re.search(
                 r"(?:\bdo not\b|\bdon't\b|\bwould not\b|\bwouldn't\b|"
                 r"\bwill not\b|\bwon't\b|\bmust not\b|\bshould not\b|"
-                r"\bshouldn't\b|\bnever\b|\bavoid\b|\brefuse to\b)"
+                r"\bshouldn't\b|\bnever\b|\bavoid\b|\brefuse to\b|"
+                r"\bno need (?:to|for)\b|\bwithout\b|\brather than\b|"
+                r"\binstead of\b)"
                 r"[^.!?\n;:]{0,60}$",
                 prefix,
+                re.IGNORECASE,
+            )
+            negated_inside = re.search(
+                r"\b(?:not|never|avoid|without|rather than|instead of|unnecessary|overkill)\b",
+                match.group(0),
                 re.IGNORECASE,
             )
             negated_after = re.match(
@@ -111,13 +124,20 @@ def score(task: dict, output: str) -> tuple[bool, list[str]]:
                 suffix,
                 re.IGNORECASE,
             )
-            if not (negated_before or negated_after):
+            if not (negated_before or negated_inside or negated_after):
                 violations.append(f"found: /{pattern}/ → {match.group(0)[:50]!r}")
                 break
     return (not violations, violations)
 
 
-def run_one(task: dict, arm_text: str, timeout: int, workspace: Path) -> tuple[str, dict]:
+def run_one_claude(
+    task: dict,
+    arm_text: str,
+    model: str,
+    max_budget_usd: float,
+    timeout: int,
+    workspace: Path,
+) -> tuple[str, dict]:
     """Run one task in one arm. Returns (output_text, usage_metadata).
 
     Uses --output-format json rather than text because the JSON envelope carries
@@ -128,7 +148,15 @@ def run_one(task: dict, arm_text: str, timeout: int, workspace: Path) -> tuple[s
     prompt = f"{arm_text}\n\n{SCENARIO_PREAMBLE}{task['prompt']}"
     try:
         proc = subprocess.run(
-            ["claude", "-p", prompt, "--output-format", "json"],
+            [
+                "claude", "-p", prompt,
+                "--output-format", "json",
+                "--model", model,
+                "--max-budget-usd", str(max_budget_usd),
+                "--safe-mode",
+                "--tools", "",
+                "--no-session-persistence",
+            ],
             capture_output=True,
             text=True,
             timeout=timeout,
@@ -137,7 +165,14 @@ def run_one(task: dict, arm_text: str, timeout: int, workspace: Path) -> tuple[s
             stdin=subprocess.DEVNULL,
         )
         if proc.returncode:
-            detail = proc.stderr.strip().splitlines()[-1] if proc.stderr.strip() else "no stderr"
+            detail = proc.stderr.strip().splitlines()[-1] if proc.stderr.strip() else ""
+            if proc.stdout.strip():
+                try:
+                    failure = json.loads(proc.stdout)
+                    detail = failure.get("result") or failure.get("terminal_reason") or detail
+                except json.JSONDecodeError:
+                    detail = proc.stdout.strip().splitlines()[-1][-500:]
+            detail = detail or "no diagnostic output"
             print(f"\n  warning: claude exited {proc.returncode} for {task['id']}: {detail}", file=sys.stderr)
             return "", {}
         payload = json.loads(proc.stdout)
@@ -171,18 +206,112 @@ def run_one(task: dict, arm_text: str, timeout: int, workspace: Path) -> tuple[s
         raise SystemExit(1)
 
 
-def report(results: list[Result], arms: Sequence[str]) -> None:
-    print("\n  pass rate by arm")
-    print("  " + "─" * 64)
+def run_one_codex(
+    task: dict,
+    arm_text: str,
+    model: str,
+    effort: str,
+    timeout: int,
+    workspace: Path,
+) -> tuple[str, dict]:
+    """Run one isolated Codex call. Codex reports tokens but not dollar cost."""
+    prompt = f"{arm_text}\n\n{SCENARIO_PREAMBLE}{task['prompt']}"
+    cmd = [
+        "codex", "exec",
+        "--json",
+        "--ephemeral",
+        "--ignore-user-config",
+        "--ignore-rules",
+        "--skip-git-repo-check",
+        "--sandbox", "read-only",
+        "--model", model,
+        "--config", f'model_reasoning_effort="{effort}"',
+        "--cd", str(workspace),
+        prompt,
+    ]
+    started = time.monotonic()
+    try:
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+            stdin=subprocess.DEVNULL,
+        )
+    except subprocess.TimeoutExpired:
+        return "", {}
+    except FileNotFoundError:
+        print("error: `codex` CLI not found on PATH", file=sys.stderr)
+        raise SystemExit(1)
+
+    messages = []
+    usage = {}
+    parse_errors = []
+    for lineno, line in enumerate(proc.stdout.splitlines(), 1):
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            parse_errors.append(f"line {lineno} is not JSON")
+            continue
+        if event.get("type") == "item.completed":
+            item = event.get("item", {})
+            if item.get("type") == "agent_message":
+                messages.append(item.get("text", ""))
+        elif event.get("type") == "turn.completed":
+            usage = event.get("usage", {})
+
+    if proc.returncode or parse_errors or not messages or not usage:
+        detail = proc.stderr.strip().splitlines()[-1] if proc.stderr.strip() else ""
+        if parse_errors:
+            detail = ", ".join(parse_errors[:3])
+        detail = detail or "missing final message or usage"
+        print(f"\n  warning: codex failed for {task['id']}: {detail}", file=sys.stderr)
+        return "", {}
+
+    cached = int(usage.get("cached_input_tokens", 0) or 0)
+    total_input = int(usage.get("input_tokens", 0) or 0)
+    meta = {
+        "input_tokens": max(total_input - cached, 0),
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": cached,
+        "output_tokens": int(usage.get("output_tokens", 0) or 0),
+        "reasoning_output_tokens": int(usage.get("reasoning_output_tokens", 0) or 0),
+        "model": model,
+        "duration_ms": round((time.monotonic() - started) * 1000),
+    }
+    return messages[-1], meta
+
+
+ARM_LABELS = {
+    "A": "control, no guidance",
+    "B": "sarathi, spelled out",
+    "C": "sarathi, anchored",
+    "D": "sarathi, wrong refs",
+    "E": "sarathi, labels only",
+    "F": "caveman",
+    "G": "ponytail",
+    "H": "sarathi, deployed skill",
+}
+
+
+def report(results: list[Result], arms: Sequence[str], backend: str) -> None:
+    print("\n  pass rate by arm, with 95% Wilson intervals")
+    print("  " + "─" * 70)
     rates = {}
+    counts = {}
     for arm in arms:
         subset = [r for r in results if r.arm == arm]
         if not subset:
             continue
-        rate = sum(r.passed for r in subset) / len(subset)
-        rates[arm] = rate
-        label = {"A": "control", "B": "spelled out", "C": "anchored"}.get(arm, "")
-        print(f"  {arm}  {rate:6.1%}   n={len(subset):<4} {label}")
+        passed = sum(r.passed for r in subset)
+        rates[arm] = passed / len(subset)
+        counts[arm] = (passed, len(subset))
+        ci = stats.wilson(passed, len(subset))
+        print(
+            f"  {arm}  {rates[arm]:6.1%}  {stats.fmt_ci(ci)}  n={len(subset):<4}"
+            f" {ARM_LABELS.get(arm, '')}"
+        )
 
     print("\n  by anchor")
     print("  " + "─" * 64)
@@ -206,7 +335,10 @@ def report(results: list[Result], arms: Sequence[str]) -> None:
     if usable:
         print("\n  tokens and cost per arm")
         print("  " + "─" * 64)
-        print(f"  {'arm':<5}{'out tok':>10}{'fresh in':>10}{'cache rd':>11}{'$/call':>10}")
+        print(
+            f"  {'arm':<5}{'out tok':>10}{'fresh in':>10}{'cache rd':>11}"
+            f"{'tok/pass':>11}{'$/call':>10}{'$/pass':>10}"
+        )
         for arm in arms:
             subset = [r for r in usable if r.arm == arm]
             if not subset:
@@ -214,69 +346,105 @@ def report(results: list[Result], arms: Sequence[str]) -> None:
             out = statistics.fmean(r.usage["output_tokens"] for r in subset)
             fresh = statistics.fmean(r.usage["input_tokens"] for r in subset)
             cread = statistics.fmean(r.usage["cache_read_input_tokens"] for r in subset)
-            cost = statistics.fmean(r.usage["cost_usd"] for r in subset)
-            print(f"  {arm:<5}{out:>10.0f}{fresh:>10.0f}{cread:>11.0f}{cost:>10.4f}")
+            passed = sum(r.passed for r in subset)
+            total_tokens = sum(
+                r.usage.get("input_tokens", 0)
+                + r.usage.get("cache_creation_input_tokens", 0)
+                + r.usage.get("cache_read_input_tokens", 0)
+                + r.usage.get("output_tokens", 0)
+                for r in subset
+            )
+            tokens_per_pass = total_tokens / passed if passed else float("nan")
+            costs = [r.usage["cost_usd"] for r in subset if "cost_usd" in r.usage]
+            cost = statistics.fmean(costs) if len(costs) == len(subset) else float("nan")
+            cost_per_pass = sum(costs) / passed if passed and len(costs) == len(subset) else float("nan")
+            cost_text = f"{cost:.4f}" if cost == cost else "n/a"
+            cpp = f"{cost_per_pass:.4f}" if cost_per_pass == cost_per_pass else "n/a"
+            tpp = f"{tokens_per_pass:.0f}" if tokens_per_pass == tokens_per_pass else "n/a"
+            print(
+                f"  {arm:<5}{out:>10.0f}{fresh:>10.0f}{cread:>11.0f}"
+                f"{tpp:>11}{cost_text:>10}{cpp:>10}"
+            )
         print("  " + "─" * 64)
-        print("  note: inside Claude Code every call carries a ~11k-token system")
-        print("  prompt, so the arm difference (B−C ≈ 434 tok) is a small share of")
-        print("  total spend here. The compression matters far more in a lean API")
-        print("  context than inside a heavyweight agent harness. Report both.")
+        print(f"  note: {backend} system context can dominate token usage, so an")
+        print("  arm's prompt and visible output are only part of total spend.")
+        print("  $/pass is a point estimate, not proof when pass intervals are wide.")
 
-    def delta(x: str, y: str) -> str:
-        if x not in rates or y not in rates:
-            return "n/a"
-        return f"{rates[x] - rates[y]:+.1%}"
+    def compare(x: str, y: str, question: str) -> None:
+        if x not in counts or y not in counts:
+            return
+        px, nx = counts[x]
+        py, ny = counts[y]
+        ci = stats.newcombe(px, nx, py, ny)
+        diff = rates[x] - rates[y]
+        mark = "*" if stats.significant(ci) else " "
+        print(f"  {x} - {y}  {diff:+6.1%}  {stats.fmt_ci(ci)} {mark}  {question}")
 
-    print("\n  comparisons")
-    print("  " + "─" * 64)
-    if "A" in rates and "B" in rates:
-        print(f"  B − A  {delta('B','A'):>8}   do the principles help at all?")
-    if "B" in rates and "C" in rates:
-        print(f"  C − B  {delta('C','B'):>8}   does the pointer carry the spelled-out principle?")
-    if "C" in rates and "E" in rates:
-        print(f"  C − E  {delta('C','E'):>8}   does the reference beat the label alone?")
-    if "C" in rates and "D" in rates:
-        print(f"  C − D  {delta('C','D'):>8}   does a correct reference beat an incorrect one?")
+    print("\n  comparisons  (* = interval excludes zero)")
+    print("  " + "\u2500" * 70)
+    compare("B", "A", "do the principles help at all?")
+    compare("C", "B", "does the pointer carry the spelled-out principle?")
+    compare("C", "E", "does the reference beat the label alone?")
+    compare("C", "D", "does a CORRECT reference beat a wrong one?")
+    compare("C", "A", "sarathi vs no guidance")
+    compare("C", "F", "sarathi vs caveman")
+    compare("C", "G", "sarathi vs ponytail")
+    compare("H", "A", "deployed sarathi vs no guidance")
+    compare("H", "F", "deployed sarathi vs caveman")
+    compare("H", "G", "deployed sarathi vs ponytail")
 
-    print("\n  reading")
-    print("  " + "─" * 64)
-    if "A" in rates and "B" in rates and rates["B"] - rates["A"] < 0.05:
-        print("  ⚠  B ≈ A. The principles show no effect on this suite, so every")
-        print("     later comparisons cannot show much. Improve the tasks first.")
-    if "C" in rates and "E" in rates:
-        if abs(rates["C"] - rates["E"]) < 0.05:
-            print("  C ≈ E. The English label carries the meaning; the verse reference")
-            print("  adds nothing measurable. The labels work, but the references")
-            print("  add no demonstrated value.")
-        elif rates["C"] > rates["E"]:
-            print("  C > E. The reference contributes beyond the label. This is the")
-            print("  result the project was built to find.")
+    # Power. Without this the reader cannot tell "no effect" from "no resolution".
+    if "A" in rates and rates["A"] not in (0.0, 1.0):
+        n_here = counts["A"][1]
+        for effect in (0.15, 0.25, 0.35):
+            need = stats.required_n(rates["A"], effect)
+            if need <= n_here:
+                detectable = effect
+                break
         else:
-            print("  C < E. The reference performs worse than a bare label, probably")
-            print("  register contamination. Check output length and tone in arm C.")
-    if "C" in rates and "D" in rates and abs(rates["C"] - rates["D"]) < 0.05:
-        print("  C ≈ D. A wrong reference performs like a correct one, so the model")
-        print("  is responding to reference SHAPE, not to the verse. Fatal for the")
-        print("  compression claim even if C beats E.")
+            detectable = None
+        print("\n  power")
+        print("  " + "\u2500" * 70)
+        print(f"  n={n_here} per arm detects roughly "
+              + (f"{detectable:.0%}+ effects." if detectable else "only very large effects."))
+        print(f"  to detect +15pp at 80% power you would need n="
+              f"{stats.required_n(rates['A'], 0.15)} per arm.")
+        print("  intervals that span zero mean NO EVIDENCE of a difference,")
+        print("  which is not the same as evidence of no difference.")
     print()
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Five-arm experiment driver. Makes real API calls.")
+    parser = argparse.ArgumentParser(description="Isolated multi-arm experiment driver. Makes real model calls.")
+    parser.add_argument("--backend", choices=["claude", "codex"], default="claude")
     parser.add_argument("--arms", nargs="+", default=["A", "B", "C", "D", "E"])
     parser.add_argument("--tasks", nargs="+", default=["reasoning"])
+    parser.add_argument("--task-ids", nargs="+", help="optional exact task ids for a smoke run")
     parser.add_argument("--n", type=int, default=1, help="repetitions per task per arm")
     parser.add_argument("--timeout", type=int, default=180)
     parser.add_argument("--jobs", type=int, default=3, help="concurrent calls (default 3)")
+    parser.add_argument("--model", default="opus", help="exact model id or Claude alias")
+    parser.add_argument("--effort", default="medium", help="Codex reasoning effort")
+    parser.add_argument("--max-budget-per-call", type=float, default=0.50)
+    parser.add_argument("--seed", type=int, default=1729, help="deterministic job-order seed")
     parser.add_argument("--out", type=Path, default=ROOT / "results")
     parser.add_argument("--yes", action="store_true")
     args = parser.parse_args(argv)
 
-    if not shutil.which("claude"):
-        print("error: `claude` CLI not found on PATH", file=sys.stderr)
+    if not shutil.which(args.backend):
+        print(f"error: `{args.backend}` CLI not found on PATH", file=sys.stderr)
         return 1
+    if args.n < 1 or args.jobs < 1 or args.max_budget_per_call <= 0:
+        parser.error("--n, --jobs, and --max-budget-per-call must be positive")
 
     tasks = load_tasks(args.tasks)
+    if args.task_ids:
+        requested = set(args.task_ids)
+        available = {task["id"] for task in tasks}
+        missing = sorted(requested - available)
+        if missing:
+            parser.error(f"unknown --task-ids: {', '.join(missing)}")
+        tasks = [task for task in tasks if task["id"] in requested]
     arm_texts = {arm: load_arm(arm) for arm in args.arms}
     total = len(tasks) * args.n * len(args.arms)
 
@@ -299,10 +467,28 @@ def main(argv: Sequence[str] | None = None) -> int:
         for rep in range(args.n)
         for task in tasks
     ]
+    random.Random(args.seed).shuffle(jobs)
 
     def execute(job, workspace: Path):
         arm, rep, task = job
-        output, usage = run_one(task, arm_texts[arm], args.timeout, workspace)
+        if args.backend == "claude":
+            output, usage = run_one_claude(
+                task,
+                arm_texts[arm],
+                args.model,
+                args.max_budget_per_call,
+                args.timeout,
+                workspace,
+            )
+        else:
+            output, usage = run_one_codex(
+                task,
+                arm_texts[arm],
+                args.model,
+                args.effort,
+                args.timeout,
+                workspace,
+            )
         passed, violations = score(task, output)
         if not usage:
             passed = False
@@ -312,10 +498,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     print()
     results: list[Result] = []
     done = 0
-    with tempfile.TemporaryDirectory(prefix="sarathi-claude-bench-") as tmp:
-        workspace = Path(tmp)
+    with tempfile.TemporaryDirectory(prefix=f"sarathi-{args.backend}-bench-") as tmp:
+        workspace_root = Path(tmp)
         with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as pool:
-            futures = {pool.submit(execute, job, workspace): job for job in jobs}
+            futures = {}
+            for index, job in enumerate(jobs):
+                arm, rep, task = job
+                workspace = workspace_root / f"{index:04d}-{arm}-{rep}-{task['id']}"
+                workspace.mkdir()
+                futures[pool.submit(execute, job, workspace)] = job
             for future in concurrent.futures.as_completed(futures):
                 arm, rep, task = futures[future]
                 result = future.result()
@@ -341,27 +532,72 @@ def main(argv: Sequence[str] | None = None) -> int:
         for r in results
         if r.usage.get("model") and r.usage.get("model") != "unknown"
     })
+
+    def file_record(path: Path) -> dict:
+        data = path.read_bytes()
+        return {
+            "path": str(path.relative_to(ROOT)),
+            "sha256": hashlib.sha256(data).hexdigest(),
+            "bytes": len(data),
+        }
+
+    def generated_arm_record(arm: str, content: str) -> dict:
+        data = content.encode("utf-8")
+        return {
+            "arm": arm,
+            "generated_by": "bench/build_arms.py",
+            "sha256": hashlib.sha256(data).hexdigest(),
+            "bytes": len(data),
+        }
+
+    manifest = {
+        "arms": {arm: generated_arm_record(arm, arm_texts[arm]) for arm in args.arms},
+        "tasks": {name: file_record(TASKS_DIR / f"{name}.json") for name in args.tasks},
+        "scorer": file_record(ROOT / "bench/run.py"),
+        "sarathi_skill": file_record(ROOT / "skills/sarathi/SKILL.md"),
+    }
+    provenance = ROOT / "bench/vendor/provenance.json"
+    if provenance.exists():
+        manifest["competitor_provenance"] = file_record(provenance)
+
+    failed_calls = sum(not result.usage for result in results)
     meta = {
         "timestamp": stamp,
-        "claude_code_version": probe(["claude", "--version"]),
+        "backend": args.backend,
+        "backend_version": probe([args.backend, "--version"]),
         "model": ",".join(models) if models else "unknown",
+        "requested_model": args.model,
+        "reasoning_effort": args.effort if args.backend == "codex" else None,
         "arms": list(args.arms),
         "tasks": list(args.tasks),
-        "isolation": "hypothetical scenario in an empty temporary directory",
+        "task_ids": [task["id"] for task in tasks],
+        "isolation": "hypothetical scenario in a fresh empty temporary directory per call",
         "reps": args.n,
         "n_per_arm": len(tasks) * args.n,
+        "seed": args.seed,
+        "max_budget_per_call_usd": args.max_budget_per_call,
+        "isolation_flags": (
+            ["--safe-mode", "--tools", "", "--no-session-persistence"]
+            if args.backend == "claude"
+            else ["--ephemeral", "--ignore-user-config", "--ignore-rules", "--sandbox", "read-only"]
+        ),
+        "manifest": manifest,
+        "valid": failed_calls == 0,
+        "failed_calls": failed_calls,
         "command": " ".join(sys.argv),
     }
     (run_dir / "meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
     (run_dir / "results.json").write_text(
         json.dumps([r.__dict__ for r in results], indent=2), encoding="utf-8"
     )
-    print(f"\n  model: {meta['model']}   claude code: {meta['claude_code_version']}")
+    summary_path = run_dir / "summary.json"
+    summary_path.write_text(json.dumps(analyze.analyze(run_dir), indent=2) + "\n", encoding="utf-8")
+    print(f"\n  model: {meta['model']}   {meta['backend']}: {meta['backend_version']}")
 
-    report(results, args.arms)
+    report(results, args.arms, args.backend)
     print(f"  raw: {run_dir / 'results.json'}")
+    print(f"  summary: {summary_path}")
     print("  exact per-call token and cost metadata is included in the raw artifact\n")
-    failed_calls = sum(not result.usage for result in results)
     if failed_calls:
         print(f"  error: {failed_calls} call(s) returned no usage metadata; run is invalid\n", file=sys.stderr)
         return 1

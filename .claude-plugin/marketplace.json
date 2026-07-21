@@ -4,15 +4,15 @@
     "name": "sarathi contributors"
   },
   "metadata": {
-    "description": "A practical reasoning checklist for AI agents, with a benchmark that tests whether its compact references help.",
-    "version": "0.1.0"
+    "description": "Risk-aware reasoning discipline for verified, scoped, and concise agent work, with a reproducible benchmark.",
+    "version": "0.2.0"
   },
   "plugins": [
     {
       "name": "sarathi",
       "source": "./",
-      "description": "A short checklist that helps agents avoid reward hacking, goal drift, scope creep, overthinking, premature conclusions, and overconfident claims.",
-      "version": "0.1.0",
+      "description": "Routes effort by risk, checks evidence before claims, limits scope, changes course after failure, verifies work, and keeps handoffs concise.",
+      "version": "0.2.0",
       "license": "MIT",
       "keywords": ["reasoning", "token-efficiency", "agent-reliability", "benchmark"]
     }

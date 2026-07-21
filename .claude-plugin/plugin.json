@@ -1,7 +1,7 @@
 {
   "name": "sarathi",
-  "version": "0.1.0",
-  "description": "A practical reasoning checklist for AI agents, with a benchmark that tests whether its compact references help.",
+  "version": "0.2.0",
+  "description": "Risk-aware reasoning discipline for verified, scoped, and concise agent work, with a reproducible benchmark.",
   "author": {
     "name": "sarathi contributors"
   },
