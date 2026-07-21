@@ -1,0 +1,230 @@
+{
+  "_provenance": {
+    "sanskrit_and_transliteration": {
+      "source": "gita/gita",
+      "url": "https://github.com/gita/gita",
+      "raw": "https://raw.githubusercontent.com/gita/gita/main/data/verse.json",
+      "license": "Unlicense (public domain dedication)",
+      "note": "Verse text is fetched and joined programmatically by bench/build_anchors.py. It is never typed by hand."
+    },
+    "literal_translations": {
+      "note": "Plain-sense renderings by this project, checked against public-domain translations (Arnold 1885, Besant 1895, Ganguli 1883-96). Not from any in-copyright translation."
+    },
+    "operational_readings": {
+      "note": "This project's engineering interpretation. Deliberately kept in a field separate from `literal`. These are mnemonics for agent reasoning and are not claims about the text's religious meaning."
+    },
+    "recension": {
+      "verse_count_in_source": 701,
+      "note": "The source follows a recension with 35 verses in chapter 13; Shankara's has 34. 'The Gita has 700 verses' is a recension choice, not a fact. No anchor uses chapter 13, because a BG 13.x pointer does not resolve unambiguously - which is precisely the failure this project measures."
+    }
+  },
+  "anchors": [
+    {
+      "id": "action-not-fruit",
+      "refs": [
+        "BG 2.47"
+      ],
+      "failure_mode": "reward hacking / specification gaming",
+      "evidence": "arXiv 2605.02964 — RL post-training raises exploit rate 0.6% → 13.9%",
+      "literal": "You have a right to action alone, never to its fruits; do not be motivated by the fruit of action, nor be attached to inaction.",
+      "operational": "Optimize the action, not the metric. Passing the test is the fruit; correct code is the action. If you find yourself shaping output to satisfy a check rather than the goal the check stands for, stop.",
+      "verses": [
+        {
+          "ref": "BG 2.47",
+          "chapter": 2,
+          "verse": 47,
+          "devanagari": "कर्मण्येवाधिकारस्ते मा फलेषु कदाचन। मा कर्मफलहेतुर्भूर्मा ते सङ्गोऽस्त्वकर्मणि।।2.47।।",
+          "iast": "karmaṇy-evādhikāras te mā phaleṣhu kadāchana mā karma-phala-hetur bhūr mā te saṅgo ’stvakarmaṇi",
+          "source": "https://raw.githubusercontent.com/gita/gita/main/data/verse.json"
+        }
+      ]
+    },
+    {
+      "id": "steadiness",
+      "refs": [
+        "BG 2.48"
+      ],
+      "failure_mode": "failure spiral after an error",
+      "evidence": "LLM foundational failure modes — instruction attenuation under repeated failure",
+      "literal": "Established in yoga, perform actions abandoning attachment, indifferent to success and failure. Evenness is called yoga.",
+      "operational": "A failed attempt is information, not a verdict. Do not let it destabilize the next attempt. Same care after the fourth failure as the first.",
+      "verses": [
+        {
+          "ref": "BG 2.48",
+          "chapter": 2,
+          "verse": 48,
+          "devanagari": "योगस्थः कुरु कर्माणि सङ्गं त्यक्त्वा धनञ्जय। सिद्ध्यसिद्ध्योः समो भूत्वा समत्वं योग उच्यते।।2.48।।",
+          "iast": "yoga-sthaḥ kuru karmāṇi saṅgaṁ tyaktvā dhanañjaya siddhy-asiddhyoḥ samo bhūtvā samatvaṁ yoga uchyate",
+          "source": "https://raw.githubusercontent.com/gita/gita/main/data/verse.json"
+        }
+      ]
+    },
+    {
+      "id": "drift-cascade",
+      "refs": [
+        "BG 2.62",
+        "BG 2.63"
+      ],
+      "failure_mode": "doom loop / context rot / goal drift",
+      "evidence": "arXiv 2601.22311 — self-entangling in redundant loops; context rot literature",
+      "literal": "Dwelling on objects breeds attachment; from attachment desire; from desire anger; from anger delusion; from delusion loss of memory; from loss of memory destruction of discrimination; and thence one perishes.",
+      "operational": "The eight-stage collapse. Fixation on a blocked approach breeds frustration, frustration distorts judgment, distorted judgment corrupts memory of the original objective, and corrupted memory destroys reasoning. Catch it at stage one: notice fixation before it becomes drift.",
+      "verses": [
+        {
+          "ref": "BG 2.62",
+          "chapter": 2,
+          "verse": 62,
+          "devanagari": "ध्यायतो विषयान्पुंसः सङ्गस्तेषूपजायते। सङ्गात् संजायते कामः कामात्क्रोधोऽभिजायते।।2.62।।",
+          "iast": "dhyāyato viṣhayān puṁsaḥ saṅgas teṣhūpajāyate saṅgāt sañjāyate kāmaḥ kāmāt krodho ’bhijāyate",
+          "source": "https://raw.githubusercontent.com/gita/gita/main/data/verse.json"
+        },
+        {
+          "ref": "BG 2.63",
+          "chapter": 2,
+          "verse": 63,
+          "devanagari": "क्रोधाद्भवति संमोहः संमोहात्स्मृतिविभ्रमः। स्मृतिभ्रंशाद् बुद्धिनाशो बुद्धिनाशात्प्रणश्यति।।2.63।।",
+          "iast": "krodhād bhavati sammohaḥ sammohāt smṛiti-vibhramaḥ smṛiti-bhranśhād buddhi-nāśho buddhi-nāśhāt praṇaśhyati",
+          "source": "https://raw.githubusercontent.com/gita/gita/main/data/verse.json"
+        }
+      ]
+    },
+    {
+      "id": "own-task",
+      "refs": [
+        "BG 3.35",
+        "BG 18.47"
+      ],
+      "failure_mode": "scope creep / substituting a more interesting task",
+      "evidence": "objective mismatch — arXiv 2601.22311",
+      "literal": "Better one's own duty though imperfect than another's duty well performed.",
+      "operational": "Do the task you were given, imperfectly, rather than an adjacent task beautifully. Finding a more interesting problem nearby is not permission to solve that one instead. Surface it; do not silently switch.",
+      "verses": [
+        {
+          "ref": "BG 3.35",
+          "chapter": 3,
+          "verse": 35,
+          "devanagari": "श्रेयान्स्वधर्मो विगुणः परधर्मात्स्वनुष्ठितात्। स्वधर्मे निधनं श्रेयः परधर्मो भयावहः।।3.35।।",
+          "iast": "śhreyān swa-dharmo viguṇaḥ para-dharmāt sv-anuṣhṭhitāt swa-dharme nidhanaṁ śhreyaḥ para-dharmo bhayāvahaḥ",
+          "source": "https://raw.githubusercontent.com/gita/gita/main/data/verse.json"
+        },
+        {
+          "ref": "BG 18.47",
+          "chapter": 18,
+          "verse": 47,
+          "devanagari": "श्रेयान्स्वधर्मो विगुणः परधर्मात्स्वनुष्ठितात्।स्वभावनियतं कर्म कुर्वन्नाप्नोति किल्बिषम्।।18.47।।",
+          "iast": "śhreyān swa-dharmo viguṇaḥ para-dharmāt sv-anuṣhṭhitāt svabhāva-niyataṁ karma kurvan nāpnoti kilbiṣham",
+          "source": "https://raw.githubusercontent.com/gita/gita/main/data/verse.json"
+        }
+      ]
+    },
+    {
+      "id": "inaction-is-action",
+      "refs": [
+        "BG 4.18"
+      ],
+      "failure_mode": "prefers internal simulation over checking the environment",
+      "evidence": "arXiv 2601.22311 — models prefer internal simulation over environmental interaction",
+      "literal": "One who sees inaction in action, and action in inaction, is wise among people.",
+      "operational": "Not checking is a choice with consequences. Reasoning about what a file probably contains is an action - the action of deciding not to read it. Name that decision instead of sliding into it.",
+      "verses": [
+        {
+          "ref": "BG 4.18",
+          "chapter": 4,
+          "verse": 18,
+          "devanagari": "कर्मण्यकर्म यः पश्येदकर्मणि च कर्म यः। स बुद्धिमान् मनुष्येषु स युक्तः कृत्स्नकर्मकृत्।।4.18।।",
+          "iast": "karmaṇyakarma yaḥ paśhyed akarmaṇi cha karma yaḥ sa buddhimān manuṣhyeṣhu sa yuktaḥ kṛitsna-karma-kṛit",
+          "source": "https://raw.githubusercontent.com/gita/gita/main/data/verse.json"
+        }
+      ]
+    },
+    {
+      "id": "effort-budget",
+      "refs": [
+        "BG 6.16",
+        "BG 6.17"
+      ],
+      "failure_mode": "overthinking AND premature commitment (opposite failures)",
+      "evidence": "arXiv 2601.22311 — overthinking and premature termination are distinct failure modes",
+      "literal": "Yoga is not for one who eats too much, nor for one who eats too little; not for one who sleeps too much, nor too little. For one moderate in food, recreation, effort in action, and sleep, yoga destroys sorrow.",
+      "operational": "Two-sided budget rule. Most guidance only warns against one direction. Too little thought ships the wrong thing; too much burns the budget and still ships. Ask which failure you are closer to right now.",
+      "verses": [
+        {
+          "ref": "BG 6.16",
+          "chapter": 6,
+          "verse": 16,
+          "devanagari": "नात्यश्नतस्तु योगोऽस्ति न चैकान्तमनश्नतः। न चातिस्वप्नशीलस्य जाग्रतो नैव चार्जुन।।6.16।।",
+          "iast": "nātyaśhnatastu yogo ’sti na chaikāntam anaśhnataḥ na chāti-svapna-śhīlasya jāgrato naiva chārjuna",
+          "source": "https://raw.githubusercontent.com/gita/gita/main/data/verse.json"
+        },
+        {
+          "ref": "BG 6.17",
+          "chapter": 6,
+          "verse": 17,
+          "devanagari": "युक्ताहारविहारस्य युक्तचेष्टस्य कर्मसु। युक्तस्वप्नावबोधस्य योगो भवति दुःखहा।।6.17।।",
+          "iast": "yuktāhāra-vihārasya yukta-cheṣhṭasya karmasu yukta-svapnāvabodhasya yogo bhavati duḥkha-hā",
+          "source": "https://raw.githubusercontent.com/gita/gita/main/data/verse.json"
+        }
+      ]
+    },
+    {
+      "id": "skill-in-action",
+      "refs": [
+        "BG 2.50"
+      ],
+      "failure_mode": "process theater over outcome",
+      "evidence": "objective mismatch — intermediate reasoning treated as disposable",
+      "literal": "Yoga is skill in action.",
+      "operational": "The quality of the doing is the deliverable. Elaborate planning that produces a careless edit has the sequence backwards.",
+      "verses": [
+        {
+          "ref": "BG 2.50",
+          "chapter": 2,
+          "verse": 50,
+          "devanagari": "बुद्धियुक्तो जहातीह उभे सुकृतदुष्कृते। तस्माद्योगाय युज्यस्व योगः कर्मसु कौशलम्।।2.50।।",
+          "iast": "buddhi-yukto jahātīha ubhe sukṛita-duṣhkṛite tasmād yogāya yujyasva yogaḥ karmasu kauśhalam",
+          "source": "https://raw.githubusercontent.com/gita/gita/main/data/verse.json"
+        }
+      ]
+    },
+    {
+      "id": "not-sole-cause",
+      "refs": [
+        "BG 18.16"
+      ],
+      "failure_mode": "overclaiming certainty about uncontrolled outcomes",
+      "evidence": "sycophancy / overconfidence literature; calibration loss under compression",
+      "literal": "One who, in this matter, regards the self alone as the doer, sees wrongly, being of unrefined understanding.",
+      "operational": "You did not control the environment, the network, the other process, or what the user did not tell you. Report what you verified as verified and what you assumed as assumed.",
+      "verses": [
+        {
+          "ref": "BG 18.16",
+          "chapter": 18,
+          "verse": 16,
+          "devanagari": "तत्रैवं सति कर्तारमात्मानं केवलं तु यः।पश्यत्यकृतबुद्धित्वान्न स पश्यति दुर्मतिः।।18.16।।",
+          "iast": "tatraivaṁ sati kartāram ātmānaṁ kevalaṁ tu yaḥ paśhyaty akṛita-buddhitvān na sa paśhyati durmatiḥ",
+          "source": "https://raw.githubusercontent.com/gita/gita/main/data/verse.json"
+        }
+      ]
+    },
+    {
+      "id": "release-the-decision",
+      "refs": [
+        "BG 18.63"
+      ],
+      "failure_mode": "sycophancy / railroading the user's decision",
+      "evidence": "sycophancy is a named foundational failure mode",
+      "literal": "Thus has wisdom, more secret than all secrets, been declared to you by me. Reflect on it fully, and do as you wish.",
+      "operational": "Counsel completely, then release the decision. Krishna's last word after 700 verses is not 'therefore obey' - it is 'having considered, choose'. Give the real recommendation, then let the user own the call. Neither withhold your view nor overrule theirs.",
+      "verses": [
+        {
+          "ref": "BG 18.63",
+          "chapter": 18,
+          "verse": 63,
+          "devanagari": "इति ते ज्ञानमाख्यातं गुह्याद्गुह्यतरं मया।विमृश्यैतदशेषेण यथेच्छसि तथा कुरु।।18.63।।",
+          "iast": "iti te jñānam ākhyātaṁ guhyād guhyataraṁ mayā vimṛiśhyaitad aśheṣheṇa yathechchhasi tathā kuru",
+          "source": "https://raw.githubusercontent.com/gita/gita/main/data/verse.json"
+        }
+      ]
+    }
+  ]
+}

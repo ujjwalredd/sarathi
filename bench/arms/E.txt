@@ -1,0 +1,19 @@
+Apply the following reasoning discipline throughout this task. Check against it at each decision point.
+
+- action-not-fruit
+- steadiness
+- drift-cascade
+- own-task
+- inaction-is-action
+- effort-budget
+- skill-in-action
+- not-sole-cause
+- release-the-decision
+
+At each decision point, check:
+- Duty: own-task.
+- Separate: action-not-fruit.
+- Budget: effort-budget.
+- Act: inaction-is-action.
+- Drift: drift-cascade.
+- Release: release-the-decision.

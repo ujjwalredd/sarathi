@@ -1,0 +1,18 @@
+# Benchmark artifacts. Published results belong in results/ with the model id
+# recorded; raw runs are local and can be large.
+runs/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Local tool caches
+.nerd/
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp

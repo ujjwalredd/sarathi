@@ -1,0 +1,48 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      # Stdlib only, by design: a benchmark that is hard to install is a
+      # benchmark nobody re-runs.
+      - name: Run tests
+        run: python -m unittest discover bench -v
+
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check repo invariants
+        run: python bench/validate.py
+
+  reproducible:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # The arms must be regenerable from anchors.json. If a hand edit crept
+      # into an arm file, B and C no longer differ only in encoding and the
+      # experiment is confounded.
+      - name: Arms regenerate identically
+        run: |
+          python bench/build_arms.py
+          git diff --exit-code bench/arms/ || {
+            echo "arms drifted from anchors.json — regenerate, do not hand-edit"; exit 1; }

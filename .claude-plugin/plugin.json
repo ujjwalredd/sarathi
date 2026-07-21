@@ -1,0 +1,14 @@
+{
+  "name": "sarathi",
+  "version": "0.1.0",
+  "description": "Reasoning discipline for agents, encoded as compact anchors. The charioteer counsels; the warrior decides. Ships the experiment that tests whether the anchors actually work.",
+  "author": {
+    "name": "sarathi contributors"
+  },
+  "keywords": [
+    "reasoning",
+    "token-efficiency",
+    "agent-reliability",
+    "benchmark"
+  ]
+}

@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+title: "sarathi: testing whether a shared text can act as a compression codebook for agent reasoning"
+message: "If you use this work or its benchmark design, please cite it."
+type: software
+authors:
+  - name: "sarathi contributors"
+repository-code: "https://github.com/<your-org>/sarathi"
+license: MIT
+version: 0.1.0
+date-released: 2026-07-20
+keywords:
+  - large language models
+  - agent reasoning
+  - prompt compression
+  - ablation study
+abstract: >-
+  Token-efficiency skills for coding agents compress by deletion. sarathi tests a
+  different mechanism: that a widely-known text already present in a model's weights
+  can act as a shared codebook, so a short reference transmits a principle that would
+  otherwise cost a paragraph. Nine anchors drawn from the Bhagavad Gita are mapped to
+  documented agent failure modes. A five-arm design separates the contribution of the
+  principle, the English label, and the verse reference itself, including a control in
+  which references are deterministically scrambled to real but incorrect verses.

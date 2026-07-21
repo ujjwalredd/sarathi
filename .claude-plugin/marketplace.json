@@ -1,0 +1,20 @@
+{
+  "name": "sarathi",
+  "owner": {
+    "name": "sarathi contributors"
+  },
+  "metadata": {
+    "description": "Reasoning discipline for agents, encoded as compact anchors. Ships the ablation study that tests whether the encoding works.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "sarathi",
+      "source": "./",
+      "description": "Nine anchors for documented agent failure modes: reward hacking, goal drift, scope creep, overthinking, premature commitment, sycophancy. The charioteer counsels; the warrior decides.",
+      "version": "0.1.0",
+      "license": "MIT",
+      "keywords": ["reasoning", "token-efficiency", "agent-reliability", "benchmark"]
+    }
+  ]
+}
