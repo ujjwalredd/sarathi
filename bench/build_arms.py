@@ -1,29 +1,27 @@
 #!/usr/bin/env python3
-"""Generate the five experiment arms from a single source of truth.
+"""Generate five comparable benchmark prompts from reference/anchors.json.
 
-The central claim is that a verse reference compresses a principle better than
-spelling that principle out. Testing it requires the arms to carry the SAME
-content and differ ONLY in encoding. If they were written by hand, any
-difference in result could be the author's prose rather than the mechanism.
+The experiment asks whether a short verse reference can carry the same practical
+guidance as a full English explanation. Generating every condition from one file
+keeps the comparison fair and reproducible.
 
-So all are generated from reference/anchors.json:
+The five conditions are:
 
     arm A   nothing                          control
     arm B   `operational` text in full       the principle, spelled out
     arm C   label + correct `BG x.y`         the principle, as a pointer
-    arm D   label + WRONG `BG x.y`           ablation: does correctness matter?
-    arm E   label alone, no reference        ablation: does the pointer matter?
+    arm D   label + incorrect `BG x.y`       control: does correctness matter?
+    arm E   label alone, no reference        control: does the pointer matter?
 
-The ablations are the point. A three-arm design cannot distinguish "the verse
-reference works" from "any short label works" - if `action-not-fruit` carries
-the meaning on its own, the reference is decoration and A/B/C would never show
-it.
+The two control conditions answer questions that A, B, and C cannot answer alone.
+The label may carry the idea without the verse, and a reference may influence the
+model even when it points to the wrong verse.
 
     C vs E   does the reference add anything over the English label?
-    C vs D   does a CORRECT reference beat a reference-shaped token?
+    C vs D   does a correct reference beat an incorrect one?
 
-Arm D is scrambled deterministically (fixed seed) to a real but wrong verse, so
-it costs the same tokens as C. Length is held constant; only correctness varies.
+Arm D uses a fixed random seed to select real but incorrect verses. This keeps it
+close to arm C in length while changing only the accuracy of the references.
 
 Usage:
     python bench/build_arms.py
@@ -40,8 +38,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 PREAMBLE = (
-    "Apply the following reasoning discipline throughout this task. "
-    "Check against it at each decision point.\n"
+    "Use the following reasoning checklist while answering this task. "
+    "Review it when you make an important decision.\n"
 )
 
 CHECKPOINTS = [
@@ -69,7 +67,7 @@ def build_a() -> str:
 
 
 def build_b(anchors: list[dict]) -> str:
-    """Plain English. Every principle spelled out. No references."""
+    """Build the condition that spells out every principle in plain English."""
     lines = [PREAMBLE]
     for anchor in anchors:
         lines.append(f"- {anchor['operational']}")
@@ -80,7 +78,7 @@ def build_b(anchors: list[dict]) -> str:
 
 
 def build_c(anchors: list[dict]) -> str:
-    """Anchored. Label plus correct reference. The principle is a pointer."""
+    """Build the condition that uses labels with correct references."""
     lines = [PREAMBLE]
     for anchor in anchors:
         refs = ", ".join(anchor["refs"])
@@ -94,7 +92,7 @@ def build_c(anchors: list[dict]) -> str:
 # Standard-recension verse counts. Used to generate wrong-but-real references
 # for arm D. Chapter 13 is excluded: it has 34 or 35 verses depending on
 # recension, so a BG 13.x pointer is ambiguous - which is the exact failure this
-# project measures, and not a confound worth importing into the control.
+# project measures. Leaving it out avoids adding unrelated ambiguity to the control.
 CHAPTER_LENGTHS = {
     1: 47, 2: 72, 3: 43, 4: 42, 5: 29, 6: 47, 7: 30, 8: 28, 9: 34,
     10: 42, 11: 55, 12: 20, 14: 27, 15: 20, 16: 24, 17: 28, 18: 78,
@@ -103,7 +101,7 @@ SCRAMBLE_SEED = 1729
 
 
 def scramble_refs(anchors: list[dict], seed: int = SCRAMBLE_SEED) -> dict[str, list[str]]:
-    """Map each anchor to real but WRONG verse references.
+    """Map each anchor to real but incorrect verse references.
 
     Deterministic, so arm D is reproducible across runs and machines. Guarantees:
       - same number of refs per anchor as arm C (so token cost matches)
@@ -136,7 +134,7 @@ def scramble_refs(anchors: list[dict], seed: int = SCRAMBLE_SEED) -> dict[str, l
 
 
 def build_d(anchors: list[dict]) -> str:
-    """Ablation: label plus a real but WRONG reference.
+    """Build the condition that pairs each label with a real but incorrect reference.
 
     If D matches C, the model is responding to the shape of a reference rather
     than to the verse it points at.
@@ -152,11 +150,11 @@ def build_d(anchors: list[dict]) -> str:
 
 
 def build_e(anchors: list[dict]) -> str:
-    """Ablation: label alone, no reference.
+    """Build the condition that uses labels without verse references.
 
-    If E matches C, the English label does the work and the verse reference is
-    decoration. This is the comparison most likely to falsify the project, which
-    is exactly why it ships.
+    If E matches C, the English label is doing the useful work and the verse
+    reference adds no measurable value. This is an important control because it
+    can disprove the project's central idea.
     """
     lines = [PREAMBLE]
     for anchor in anchors:
@@ -201,8 +199,8 @@ def main() -> int:
         "A": "nothing (control)",
         "B": "principles spelled out",
         "C": "label + correct reference",
-        "D": "label + WRONG reference  (ablation)",
-        "E": "label only, no reference (ablation)",
+        "D": "label + incorrect reference (control)",
+        "E": "label only, no reference (control)",
     }
     for name, text in arms.items():
         print(f"  {name:<6}{len(text):>8}{estimate_tokens(text):>10}   {labels[name]}")
@@ -210,11 +208,11 @@ def main() -> int:
     b_tok, c_tok = estimate_tokens(arms["B"]), estimate_tokens(arms["C"])
     if c_tok:
         print("  " + "─" * 62)
-        print(f"  B/C ratio: {b_tok / c_tok:.1f}x  ← the compression, IF the pointers resolve")
-        print("\n  the comparisons that matter:")
+        print(f"  B/C ratio: {b_tok / c_tok:.1f}x if the references resolve correctly")
+        print("\n  key comparisons:")
         print("    C vs B   does the pointer carry the spelled-out principle?")
         print("    C vs E   does the reference add anything over the label alone?")
-        print("    C vs D   does a CORRECT reference beat a reference-shaped token?\n")
+        print("    C vs D   does a correct reference beat an incorrect one?\n")
     return 0
 
 

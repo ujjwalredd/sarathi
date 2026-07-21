@@ -40,9 +40,9 @@ jobs:
           python-version: "3.12"
       # The arms must be regenerable from anchors.json. If a hand edit crept
       # into an arm file, B and C no longer differ only in encoding and the
-      # experiment is confounded.
+      # comparison is no longer reliable.
       - name: Arms regenerate identically
         run: |
           python bench/build_arms.py
           git diff --exit-code bench/arms/ || {
-            echo "arms drifted from anchors.json — regenerate, do not hand-edit"; exit 1; }
+            echo "arms drifted from anchors.json; regenerate them instead of editing by hand"; exit 1; }

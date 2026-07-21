@@ -21,6 +21,7 @@ DESCRIPTION_BUDGET = 400
 BODY_BUDGET = 4000
 
 DEVANAGARI = re.compile(r"[ऀ-ॿ]")
+EM_DASH = "\u2014"
 
 
 def _skill_path() -> Path:
@@ -29,7 +30,11 @@ def _skill_path() -> Path:
 
 def check_json_parses() -> list[str]:
     errors = []
-    targets = [ROOT / ".claude-plugin/plugin.json", ROOT / "reference/anchors.json"]
+    targets = [
+        ROOT / ".claude-plugin/plugin.json",
+        ROOT / ".claude-plugin/marketplace.json",
+        ROOT / "reference/anchors.json",
+    ]
     targets += sorted((ROOT / "bench/tasks").glob("*.json"))
     for path in targets:
         if not path.exists():
@@ -51,7 +56,7 @@ def check_every_verse_has_a_source() -> list[str]:
     """
     path = ROOT / "reference/anchors.json"
     if not path.exists():
-        return ["reference/anchors.json missing — run bench/build_anchors.py"]
+        return ["reference/anchors.json is missing; run bench/build_anchors.py"]
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
@@ -80,7 +85,7 @@ def check_no_chapter_13() -> list[str]:
         return []
     data = json.loads(path.read_text(encoding="utf-8"))
     return [
-        f"{v['ref']} — chapter 13 is recension-ambiguous (34 vs 35 verses)"
+        f"{v['ref']}: chapter 13 is recension-ambiguous (34 vs 35 verses)"
         for a in data.get("anchors", [])
         for v in a.get("verses", [])
         if v.get("chapter") == 13
@@ -88,7 +93,7 @@ def check_no_chapter_13() -> list[str]:
 
 
 def check_every_anchor_maps_to_a_failure_mode() -> list[str]:
-    """An anchor without a documented failure mode is decoration."""
+    """Require every anchor to address a documented failure mode."""
     path = ROOT / "reference/anchors.json"
     if not path.exists():
         return []
@@ -116,7 +121,7 @@ def check_no_devanagari_in_hot_path() -> list[str]:
             continue
         text = path.read_text(encoding="utf-8")
         if DEVANAGARI.search(text):
-            errors.append(f"{path.relative_to(ROOT)}: contains Devanagari — belongs in reference/")
+            errors.append(f"{path.relative_to(ROOT)}: contains Devanagari that belongs in reference/")
     return errors
 
 
@@ -149,16 +154,37 @@ def check_skill_budget() -> list[str]:
     return errors
 
 
+def check_no_em_dash_in_authored_text() -> list[str]:
+    """Keep authored repository text free of em dashes.
+
+    Saved benchmark responses under results/ are evidence produced by models, not
+    project prose, so they remain verbatim.
+    """
+    suffixes = {".md", ".py", ".json", ".yml", ".yaml", ".cff", ".txt"}
+    errors = []
+    for path in ROOT.rglob("*"):
+        if not path.is_file():
+            continue
+        relative = path.relative_to(ROOT)
+        if relative.parts[0] in {".git", "results"} or "__pycache__" in relative.parts:
+            continue
+        if path.name != "Makefile" and path.suffix not in suffixes:
+            continue
+        if EM_DASH in path.read_text(encoding="utf-8"):
+            errors.append(f"{relative}: contains an em dash")
+    return errors
+
+
 def check_arms_differ_only_in_encoding() -> list[str]:
     """Arms B and C must come from the same anchors, or the experiment is invalid.
 
     If B mentions a principle C omits, a difference in result could be content
-    rather than encoding - which is the one confound this design exists to avoid.
+    rather than encoding, which would make the comparison unclear.
     """
     arms = ROOT / "bench/arms"
     anchors_path = ROOT / "reference/anchors.json"
     if not (arms / "B.txt").exists() or not (arms / "C.txt").exists():
-        return ["bench/arms not built — run bench/build_arms.py"]
+        return ["benchmark arms are missing; run bench/build_arms.py"]
     if not anchors_path.exists():
         return []
 
@@ -173,7 +199,7 @@ def check_arms_differ_only_in_encoding() -> list[str]:
 
     b_text = (arms / "B.txt").read_text(encoding="utf-8")
     if DEVANAGARI.search(b_text) or re.search(r"\bBG \d", b_text):
-        errors.append("arm B contains verse references — B must be reference-free to isolate the variable")
+        errors.append("arm B contains verse references, so it cannot isolate the full-text condition")
     return errors
 
 
@@ -191,7 +217,7 @@ def check_ablation_arms() -> list[str]:
     errors = []
     for name in ("D", "E"):
         if not (arms / f"{name}.txt").exists():
-            errors.append(f"arm {name} not built — run bench/build_arms.py")
+            errors.append(f"arm {name} is missing; run bench/build_arms.py")
     if errors:
         return errors
 
@@ -202,7 +228,7 @@ def check_ablation_arms() -> list[str]:
     d_refs = set(re.findall(r"BG \d+\.\d+", d_text))
     overlap = d_refs & correct
     if overlap:
-        errors.append(f"arm D contains correct references {sorted(overlap)} — the control is poisoned")
+        errors.append(f"arm D contains correct references {sorted(overlap)}, which invalidates the control")
     if not d_refs:
         errors.append("arm D has no references at all")
     if any(r.startswith("BG 13.") for r in d_refs):
@@ -210,13 +236,13 @@ def check_ablation_arms() -> list[str]:
 
     e_text = (arms / "E.txt").read_text(encoding="utf-8")
     if re.search(r"\bBG \d", e_text):
-        errors.append("arm E contains references — it must isolate the label alone")
+        errors.append("arm E contains references, so it does not isolate the label alone")
 
     # C and D must cost the same, or the comparison measures length not correctness.
     c_len = len((arms / "C.txt").read_text(encoding="utf-8"))
     d_len = len(d_text)
     if c_len and abs(c_len - d_len) / c_len > 0.05:
-        errors.append(f"arms C ({c_len}) and D ({d_len}) differ by >5% in length — confounds the ablation")
+        errors.append(f"arms C ({c_len}) and D ({d_len}) differ by more than 5%, which weakens the comparison")
 
     return errors
 
@@ -230,7 +256,7 @@ def check_fidelity_probes_cover_anchors() -> list[str]:
     data = json.loads(anchors_path.read_text(encoding="utf-8"))
     probes = probe_path.read_text(encoding="utf-8")
     return [
-        f"{a['id']}: no fidelity probe — its pointer reliability is unmeasured"
+        f"{a['id']}: no fidelity probe, so its pointer reliability is unmeasured"
         for a in data.get("anchors", [])
         if f'"{a["id"]}"' not in probes
     ]
@@ -241,10 +267,11 @@ CHECKS = [
     ("every verse has a source", check_every_verse_has_a_source),
     ("no chapter-13 anchors", check_no_chapter_13),
     ("anchors map to failure modes", check_every_anchor_maps_to_a_failure_mode),
-    ("no devanagari in hot path", check_no_devanagari_in_hot_path),
+    ("no devanagari in frequently loaded prompts", check_no_devanagari_in_hot_path),
     ("skill within budget", check_skill_budget),
+    ("authored text has no em dashes", check_no_em_dash_in_authored_text),
     ("arms differ only in encoding", check_arms_differ_only_in_encoding),
-    ("ablation arms are valid controls", check_ablation_arms),
+    ("control arms are valid", check_ablation_arms),
     ("fidelity probes cover anchors", check_fidelity_probes_cover_anchors),
 ]
 

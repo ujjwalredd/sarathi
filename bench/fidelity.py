@@ -2,8 +2,8 @@
 """Pointer-fidelity probe. The experiment that can falsify this project.
 
 Arm C replaces a paragraph with a reference like `BG 2.47`. That only works if
-the model resolves the reference to the right principle, and resolves it the
-SAME way every time. If resolution is unreliable, the compression is fake: the
+the model resolves the reference to the right principle, and resolves it in a
+consistent way. If resolution is unreliable, the compression is misleading: the
 tokens are smaller but the instruction did not arrive.
 
 This measures two things per anchor:

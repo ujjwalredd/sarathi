@@ -1,7 +1,7 @@
 {
   "name": "sarathi",
   "version": "0.1.0",
-  "description": "Reasoning discipline for agents, encoded as compact anchors. The charioteer counsels; the warrior decides. Ships the experiment that tests whether the anchors actually work.",
+  "description": "A practical reasoning checklist for AI agents, with a benchmark that tests whether its compact references help.",
   "author": {
     "name": "sarathi contributors"
   },

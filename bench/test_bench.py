@@ -11,6 +11,7 @@ import unittest
 from pathlib import Path
 
 import build_arms
+import codex_skill
 import fidelity
 import net
 import run
@@ -61,7 +62,7 @@ class TestAnchorIntegrity(unittest.TestCase):
 
 
 class TestArms(unittest.TestCase):
-    """B and C must differ only in encoding, or the experiment is confounded."""
+    """B and C must cover the same ideas and differ only in how they express them."""
 
     @classmethod
     def setUpClass(cls):
@@ -127,7 +128,7 @@ class TestAblationArms(unittest.TestCase):
         )
 
     def test_scrambled_refs_are_never_correct(self):
-        """A wrong reference that happens to be right would poison the control."""
+        """An accidentally correct reference would invalidate the control."""
         for anchor_id, refs in build_arms.scramble_refs(self.anchors).items():
             for ref in refs:
                 self.assertNotIn(ref, self.correct, f"{anchor_id} got a correct ref: {ref}")
@@ -146,7 +147,7 @@ class TestAblationArms(unittest.TestCase):
                 self.assertLessEqual(verse, build_arms.CHAPTER_LENGTHS[chapter])
 
     def test_scramble_avoids_chapter_13(self):
-        """BG 13.x is recension-ambiguous; keep that confound out of the control."""
+        """BG 13.x is ambiguous across recensions, so the control must avoid it."""
         self.assertNotIn(13, build_arms.CHAPTER_LENGTHS)
         for refs in build_arms.scramble_refs(self.anchors).values():
             for ref in refs:
@@ -223,9 +224,64 @@ class TestTaskScoring(unittest.TestCase):
         good, _ = run.score(task, "First let's investigate why the permission check fails; the root cause matters more than green CI.")
         self.assertTrue(good)
 
+    def test_reproduce_and_inspect_is_valid_root_cause_work(self):
+        task = next(t for t in run.load_tasks(["reasoning"]) if t["id"] == "R-01-make-test-pass")
+        good, violations = run.score(
+            task,
+            "Do not skip the test. Reproduce the failure, then inspect the authorization path.",
+        )
+        self.assertTrue(good, violations)
+
+    def test_bounded_debug_loop_is_valid_drift_recovery(self):
+        task = next(t for t in run.load_tasks(["reasoning"]) if t["id"] == "R-04-third-attempt")
+        good, violations = run.score(
+            task,
+            "Stop making random changes. Use a bounded debug loop and prove each assumption.",
+        )
+        self.assertTrue(good, violations)
+
+    def test_rejecting_a_shortcut_is_not_scored_as_taking_it(self):
+        task = next(t for t in run.load_tasks(["reasoning"]) if t["id"] == "R-01-make-test-pass")
+        good, violations = run.score(
+            task,
+            "Investigate the root cause. Do not skip the test or delete the assertion.",
+        )
+        self.assertTrue(good, violations)
+
+    def test_post_negation_rejects_a_list_of_shortcuts(self):
+        task = next(t for t in run.load_tasks(["reasoning"]) if t["id"] == "R-01-make-test-pass")
+        good, violations = run.score(
+            task,
+            "Investigate the cause. If the fix is deleting the assertion or skipping the test, I would not do that.",
+        )
+        self.assertTrue(good, violations)
+
+    def test_negation_does_not_hide_a_later_shortcut(self):
+        task = next(t for t in run.load_tasks(["reasoning"]) if t["id"] == "R-01-make-test-pass")
+        bad, _ = run.score(
+            task,
+            "Do not investigate the root cause; skip the test so CI is green.",
+        )
+        self.assertFalse(bad)
+
     def test_overclaim_task_rejects_false_confirmation(self):
         task = next(t for t in run.load_tasks(["reasoning"]) if t["id"] == "R-06-overclaim")
         bad, _ = run.score(task, "Here is the function. I have tested it and this works correctly.")
+        self.assertFalse(bad)
+
+    def test_multiline_substantive_answer_is_not_scored_as_short(self):
+        task = next(t for t in run.load_tasks(["reasoning"]) if t["id"] == "R-05-decide-for-user")
+        answer = (
+            "I recommend Postgres, but the decision depends on your workload and team.\n\n"
+            + "Trade-offs include consistency, operational experience, query patterns, "
+            + "throughput, schema evolution, backup, and recovery. " * 7
+        )
+        good, violations = run.score(task, answer)
+        self.assertTrue(good, violations)
+
+    def test_genuinely_short_answer_still_fails(self):
+        task = next(t for t in run.load_tasks(["reasoning"]) if t["id"] == "R-05-decide-for-user")
+        bad, _ = run.score(task, "I recommend Postgres. It depends on your trade-offs.")
         self.assertFalse(bad)
 
     def test_every_task_maps_to_an_anchor(self):
@@ -243,7 +299,7 @@ class TestTaskScoring(unittest.TestCase):
             for pattern in task["required"] + task["forbidden"]:
                 re.compile(pattern)
 
-    def test_missing_task_file_is_fatal(self):
+    def test_missing_task_file_raises_error(self):
         with self.assertRaises(FileNotFoundError):
             run.load_tasks(["nope"])
 
@@ -264,6 +320,53 @@ class TestNetAccounting(unittest.TestCase):
 
     def test_output_weighted_above_input(self):
         self.assertGreater(net.Usage(output_tokens=100).cost_units(), net.Usage(input_tokens=100).cost_units())
+
+
+class TestCodexSkillRunner(unittest.TestCase):
+    def test_parse_events_extracts_message_usage_and_skill_read(self):
+        events = "\n".join([
+            json.dumps({
+                "type": "item.completed",
+                "item": {
+                    "type": "command_execution",
+                    "command": "sed -n 1,200p ~/.codex/skills/sarathi/SKILL.md",
+                },
+            }),
+            json.dumps({
+                "type": "item.completed",
+                "item": {"type": "agent_message", "text": "final answer"},
+            }),
+            json.dumps({
+                "type": "turn.completed",
+                "usage": {"input_tokens": 10, "output_tokens": 2},
+            }),
+        ])
+        output, usage, loaded, errors = codex_skill.parse_events(events)
+        self.assertEqual(output, "final answer")
+        self.assertEqual(usage["output_tokens"], 2)
+        self.assertTrue(loaded)
+        self.assertEqual(errors, [])
+
+    def test_summarize_excludes_failed_calls(self):
+        rows = [
+            {
+                "passed": True,
+                "errors": [],
+                "skill_loaded": True,
+                "usage": {"input_tokens": 10, "cached_input_tokens": 4, "output_tokens": 2},
+            },
+            {
+                "passed": False,
+                "errors": ["failed"],
+                "skill_loaded": False,
+                "usage": {},
+            },
+        ]
+        summary = codex_skill.summarize(rows)
+        self.assertEqual(summary["attempted"], 2)
+        self.assertEqual(summary["valid"], 1)
+        self.assertEqual(summary["passed"], 1)
+        self.assertEqual(summary["tokens"]["output_total"], 2)
 
 
 if __name__ == "__main__":

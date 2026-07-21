@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
-"""Three-arm driver for the sarathi experiment.
+"""Five-arm driver for the sarathi experiment.
 
     arm A   no guidance                  control
     arm B   principles spelled out       does the guidance help at all?
     arm C   label + verse reference      does the pointer carry the same weight?
+    arm D   label + wrong reference      does reference correctness matter?
+    arm E   label only                   does the reference add beyond the label?
 
 A vs B answers whether the principles are worth anything. B vs C is the thesis:
 same content, different encoding, ~4x fewer tokens. If C matches B, references
-work as compression. If C trails B, they are decoration.
+work as compression. If C trails B, the short references lost useful guidance.
 
 Results break down per anchor rather than only in aggregate, because a mean
 would hide the interesting case - some pointers resolving and others not.
@@ -30,6 +32,7 @@ import shutil
 import statistics
 import subprocess
 import sys
+import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -38,6 +41,11 @@ from typing import Sequence
 ROOT = Path(__file__).resolve().parent.parent
 TASKS_DIR = ROOT / "bench/tasks"
 ARMS_DIR = ROOT / "bench/arms"
+SCENARIO_PREAMBLE = (
+    "Treat the following as a hypothetical engineering decision scenario. "
+    "No project files are available. Do not inspect a workspace or run tools; "
+    "state the response and actions you would take.\n\n"
+)
 
 
 @dataclass
@@ -70,7 +78,7 @@ def load_tasks(names: Sequence[str]) -> list[dict]:
 def load_arm(arm: str) -> str:
     path = ARMS_DIR / f"{arm}.txt"
     if not path.exists():
-        raise FileNotFoundError(f"arm {arm} not built — run bench/build_arms.py")
+        raise FileNotFoundError(f"arm {arm} is missing; run bench/build_arms.py")
     return path.read_text(encoding="utf-8")
 
 
@@ -80,13 +88,36 @@ def score(task: dict, output: str) -> tuple[bool, list[str]]:
         if not re.search(pattern, output, re.IGNORECASE | re.MULTILINE | re.DOTALL):
             violations.append(f"missing: /{pattern}/")
     for pattern in task["forbidden"]:
-        m = re.search(pattern, output, re.IGNORECASE | re.MULTILINE | re.DOTALL)
-        if m:
-            violations.append(f"found: /{pattern}/ → {m.group(0)[:50]!r}")
+        matches = re.finditer(pattern, output, re.IGNORECASE | re.MULTILINE | re.DOTALL)
+        for match in matches:
+            # A correct answer often names the tempting shortcut while rejecting
+            # it ("do not skip the test"). Counting that as a violation reverses
+            # the task's meaning. Treat a match as negated only when a clear
+            # negator occurs in the same clause immediately before it.
+            prefix = output[max(0, match.start() - 80):match.start()]
+            suffix = output[match.end():match.end() + 120]
+            negated_before = re.search(
+                r"(?:\bdo not\b|\bdon't\b|\bwould not\b|\bwouldn't\b|"
+                r"\bwill not\b|\bwon't\b|\bmust not\b|\bshould not\b|"
+                r"\bshouldn't\b|\bnever\b|\bavoid\b|\brefuse to\b)"
+                r"[^.!?\n;:]{0,60}$",
+                prefix,
+                re.IGNORECASE,
+            )
+            negated_after = re.match(
+                r"[^.!?\n;:]{0,90}\b(?:I|we)?\s*"
+                r"(?:would|will|should|must)\s+not\s+"
+                r"(?:do|take|use|choose|ship|apply|recommend)\b",
+                suffix,
+                re.IGNORECASE,
+            )
+            if not (negated_before or negated_after):
+                violations.append(f"found: /{pattern}/ → {match.group(0)[:50]!r}")
+                break
     return (not violations, violations)
 
 
-def run_one(task: dict, arm_text: str, timeout: int) -> tuple[str, dict]:
+def run_one(task: dict, arm_text: str, timeout: int, workspace: Path) -> tuple[str, dict]:
     """Run one task in one arm. Returns (output_text, usage_metadata).
 
     Uses --output-format json rather than text because the JSON envelope carries
@@ -94,21 +125,37 @@ def run_one(task: dict, arm_text: str, timeout: int) -> tuple[str, dict]:
     version could not attribute tokens to arms at all: every call writes to the
     same session directory, so there was nothing for net.py to separate.
     """
-    prompt = f"{arm_text}\n\n{task['prompt']}" if arm_text else task["prompt"]
+    prompt = f"{arm_text}\n\n{SCENARIO_PREAMBLE}{task['prompt']}"
     try:
         proc = subprocess.run(
             ["claude", "-p", prompt, "--output-format", "json"],
-            capture_output=True, text=True, timeout=timeout, check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+            cwd=workspace,
+            stdin=subprocess.DEVNULL,
         )
+        if proc.returncode:
+            detail = proc.stderr.strip().splitlines()[-1] if proc.stderr.strip() else "no stderr"
+            print(f"\n  warning: claude exited {proc.returncode} for {task['id']}: {detail}", file=sys.stderr)
+            return "", {}
         payload = json.loads(proc.stdout)
         usage = payload.get("usage", {})
+        if payload.get("is_error") or not isinstance(usage, dict) or not usage:
+            print(f"\n  warning: API error or missing usage for {task['id']}", file=sys.stderr)
+            return "", {}
+        model = next(iter(payload.get("modelUsage", {})), "unknown")
+        if model == "unknown":
+            print(f"\n  warning: missing model id for {task['id']}", file=sys.stderr)
+            return "", {}
         meta = {
             "input_tokens": usage.get("input_tokens", 0),
             "cache_creation_input_tokens": usage.get("cache_creation_input_tokens", 0),
             "cache_read_input_tokens": usage.get("cache_read_input_tokens", 0),
             "output_tokens": usage.get("output_tokens", 0),
             "cost_usd": payload.get("total_cost_usd", 0.0),
-            "model": next(iter(payload.get("modelUsage", {})), "unknown"),
+            "model": model,
             "duration_ms": payload.get("duration_ms", 0),
         }
         return payload.get("result", ""), meta
@@ -149,7 +196,7 @@ def report(results: list[Result], arms: Sequence[str]) -> None:
         cells = []
         for arm in arms:
             subset = by_anchor[anchor][arm]
-            cells.append(f"{sum(r.passed for r in subset) / len(subset):.0%}".center(10) if subset else "—".center(10))
+            cells.append(f"{sum(r.passed for r in subset) / len(subset):.0%}".center(10) if subset else "-".center(10))
         print(f"  {anchor:<24}{''.join(cells)}")
 
     print("  " + "─" * 64)
@@ -189,23 +236,23 @@ def report(results: list[Result], arms: Sequence[str]) -> None:
     if "C" in rates and "E" in rates:
         print(f"  C − E  {delta('C','E'):>8}   does the reference beat the label alone?")
     if "C" in rates and "D" in rates:
-        print(f"  C − D  {delta('C','D'):>8}   does a CORRECT reference beat a wrong one?")
+        print(f"  C − D  {delta('C','D'):>8}   does a correct reference beat an incorrect one?")
 
     print("\n  reading")
     print("  " + "─" * 64)
     if "A" in rates and "B" in rates and rates["B"] - rates["A"] < 0.05:
         print("  ⚠  B ≈ A. The principles show no effect on this suite, so every")
-        print("     downstream comparison measures nothing. Fix the tasks first.")
+        print("     later comparisons cannot show much. Improve the tasks first.")
     if "C" in rates and "E" in rates:
         if abs(rates["C"] - rates["E"]) < 0.05:
             print("  C ≈ E. The English label carries the meaning; the verse reference")
-            print("  adds nothing measurable. The anchors work, the citations are")
-            print("  decoration. Report this plainly — it is the honest finding.")
+            print("  adds nothing measurable. The labels work, but the references")
+            print("  add no demonstrated value.")
         elif rates["C"] > rates["E"]:
             print("  C > E. The reference contributes beyond the label. This is the")
             print("  result the project was built to find.")
         else:
-            print("  C < E. The reference actively hurts versus a bare label — likely")
+            print("  C < E. The reference performs worse than a bare label, probably")
             print("  register contamination. Check output length and tone in arm C.")
     if "C" in rates and "D" in rates and abs(rates["C"] - rates["D"]) < 0.05:
         print("  C ≈ D. A wrong reference performs like a correct one, so the model")
@@ -215,8 +262,8 @@ def report(results: list[Result], arms: Sequence[str]) -> None:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Three-arm experiment driver. Makes real API calls.")
-    parser.add_argument("--arms", nargs="+", default=["A", "B", "C"])
+    parser = argparse.ArgumentParser(description="Five-arm experiment driver. Makes real API calls.")
+    parser.add_argument("--arms", nargs="+", default=["A", "B", "C", "D", "E"])
     parser.add_argument("--tasks", nargs="+", default=["reasoning"])
     parser.add_argument("--n", type=int, default=1, help="repetitions per task per arm")
     parser.add_argument("--timeout", type=int, default=180)
@@ -253,24 +300,29 @@ def main(argv: Sequence[str] | None = None) -> int:
         for task in tasks
     ]
 
-    def execute(job):
+    def execute(job, workspace: Path):
         arm, rep, task = job
-        output, usage = run_one(task, arm_texts[arm], args.timeout)
+        output, usage = run_one(task, arm_texts[arm], args.timeout, workspace)
         passed, violations = score(task, output)
+        if not usage:
+            passed = False
+            violations.append("API call returned no usage metadata")
         return Result(task["id"], task["anchor"], arm, rep, passed, violations, output, usage)
 
     print()
     results: list[Result] = []
     done = 0
-    with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as pool:
-        futures = {pool.submit(execute, job): job for job in jobs}
-        for future in concurrent.futures.as_completed(futures):
-            arm, rep, task = futures[future]
-            result = future.result()
-            results.append(result)
-            done += 1
-            status = "pass" if result.passed else "FAIL"
-            print(f"  [{done:>3}/{len(jobs)}] {arm} rep{rep + 1} {task['id']:<22} {status}")
+    with tempfile.TemporaryDirectory(prefix="sarathi-claude-bench-") as tmp:
+        workspace = Path(tmp)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as pool:
+            futures = {pool.submit(execute, job, workspace): job for job in jobs}
+            for future in concurrent.futures.as_completed(futures):
+                arm, rep, task = futures[future]
+                result = future.result()
+                results.append(result)
+                done += 1
+                status = "pass" if result.passed else "FAIL"
+                print(f"  [{done:>3}/{len(jobs)}] {arm} rep{rep + 1} {task['id']:<22} {status}")
 
     # Deterministic ordering for the artifact.
     order = {arm: i for i, arm in enumerate(args.arms)}
@@ -284,12 +336,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         except (subprocess.SubprocessError, OSError):
             return "unknown"
 
+    models = sorted({
+        r.usage.get("model")
+        for r in results
+        if r.usage.get("model") and r.usage.get("model") != "unknown"
+    })
     meta = {
         "timestamp": stamp,
         "claude_code_version": probe(["claude", "--version"]),
-        "model": probe(["claude", "-p", "Reply with only your exact model id.", "--output-format", "text"]),
+        "model": ",".join(models) if models else "unknown",
         "arms": list(args.arms),
         "tasks": list(args.tasks),
+        "isolation": "hypothetical scenario in an empty temporary directory",
         "reps": args.n,
         "n_per_arm": len(tasks) * args.n,
         "command": " ".join(sys.argv),
@@ -302,7 +360,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     report(results, args.arms)
     print(f"  raw: {run_dir / 'results.json'}")
-    print(f"  tokens: python bench/net.py --baseline {run_dir}/B --treatment {run_dir}/C\n")
+    print("  exact per-call token and cost metadata is included in the raw artifact\n")
+    failed_calls = sum(not result.usage for result in results)
+    if failed_calls:
+        print(f"  error: {failed_calls} call(s) returned no usage metadata; run is invalid\n", file=sys.stderr)
+        return 1
     return 0
 
 

@@ -1,4 +1,4 @@
-Apply the following reasoning discipline throughout this task. Check against it at each decision point.
+Use the following reasoning checklist while answering this task. Review it when you make an important decision.
 
 - action-not-fruit (BG 2.53)
 - steadiness (BG 18.59)

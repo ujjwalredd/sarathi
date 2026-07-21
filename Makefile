@@ -1,4 +1,4 @@
-.PHONY: help build test validate check pilot bench fidelity install uninstall clean all
+.PHONY: help build test validate check pilot bench fidelity codex-baseline codex-auto codex-explicit install uninstall clean all
 
 # Stdlib only, by design: a benchmark that is hard to install is a benchmark
 # nobody re-runs, and re-running is the whole point of this repo.
@@ -7,17 +7,20 @@ JOBS ?= 4
 N ?= 1
 
 help:
-	@echo "sarathi — make targets"
+	@echo "sarathi make targets"
 	@echo ""
 	@echo "  build       regenerate reference/anchors.json and all five arms"
 	@echo "  test        run the unit suite (no API calls, no cost)"
 	@echo "  validate    check repo invariants (no API calls, no cost)"
 	@echo "  check       test + validate. run this before every commit"
 	@echo ""
-	@echo "  COSTS REAL MONEY — each call is a full Claude Code session:"
+	@echo "  COSTS REAL MONEY: each call starts a full model session"
 	@echo "  fidelity    do the verse pointers resolve?  (9 x N calls)"
 	@echo "  pilot       fidelity N=3 + all five arms N=1 (~67 calls)"
 	@echo "  bench       full run, set N=5 or higher     (40 x N calls)"
+	@echo "  codex-baseline  installed-skill control; run before installing Sarathi"
+	@echo "  codex-auto      installed skill with normal automatic routing"
+	@echo "  codex-explicit  installed skill explicitly requested in every prompt"
 	@echo ""
 	@echo "  install     install the plugin into Claude Code from this directory"
 	@echo "  uninstall   remove it"
@@ -49,6 +52,15 @@ pilot:
 bench:
 	$(PY) bench/run.py --arms A B C D E --n $(N) --jobs $(JOBS)
 
+codex-baseline:
+	$(PY) bench/codex_skill.py --condition baseline --expect-skill absent --n $(N) --jobs $(JOBS)
+
+codex-auto:
+	$(PY) bench/codex_skill.py --condition sarathi --expect-skill present --n $(N) --jobs $(JOBS)
+
+codex-explicit:
+	$(PY) bench/codex_skill.py --condition sarathi-explicit --expect-skill present --n $(N) --jobs $(JOBS)
+
 install:
 	claude plugin marketplace add $(CURDIR)
 	claude plugin install sarathi@sarathi
@@ -60,6 +72,6 @@ uninstall:
 clean:
 	find . -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null || true
 	find . -name '.DS_Store' -delete 2>/dev/null || true
-	@echo "note: results/ is kept — published numbers must stay reproducible"
+	@echo "note: results/ is kept because published numbers must stay reproducible"
 
 all: build check

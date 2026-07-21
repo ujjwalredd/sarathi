@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Net token accounting for Claude Code sessions.
+"""Compare the full token cost of two groups of Claude Code sessions.
 
-Every skill in the token-efficiency category reports gross output savings. None
-subtract what the skill itself costs to carry. This computes the net.
+Output-token savings do not tell the whole story because the skill prompt also
+uses input tokens. This script includes both sides of that cost.
 
 The distinction that matters is *where* a skill's text lands:
 
@@ -242,7 +242,7 @@ def compare(baseline: dict, treatment: dict, price_in: float | None, price_out: 
     t_models = ",".join(treatment["models"]) or "unknown"
     add(f"  model    {b_models} → {t_models}")
     if b_models != t_models:
-        add("  ⚠  models differ between arms — this comparison is not valid")
+        add("  ⚠  models differ between arms, so this comparison is not valid")
     add("  " + "─" * 68)
 
     add("  output tokens        "
@@ -278,7 +278,7 @@ def compare(baseline: dict, treatment: dict, price_in: float | None, price_out: 
             mean = statistics.fmean(deltas)
             add(f"  per-session mean     {mean:+.1f}%   95% CI [{lo:+.1f}%, {hi:+.1f}%]   n={len(deltas)}")
             if lo < 0 < hi:
-                add("  ⚠  CI spans zero — this run does not show a real effect")
+                add("  ⚠  CI spans zero, so this run does not show a clear effect")
     elif len(b_vals) != len(t_vals):
         add("  note: arms differ in length; per-session CI omitted (needs paired runs)")
     else:
@@ -288,9 +288,9 @@ def compare(baseline: dict, treatment: dict, price_in: float | None, price_out: 
     verdict = "net win" if t_units < b_units else "net loss"
     gross = _pct(t.output_tokens, b.output_tokens)
     net = _pct(t_units, b_units)
-    add(f"  VERDICT: {verdict}. gross output {_fmt_pct(gross).strip()}, net {_fmt_pct(net).strip()}")
+    add(f"  VERDICT: {verdict}. output change {_fmt_pct(gross).strip()}, net {_fmt_pct(net).strip()}")
     if gross == gross and net == net and gross < 0 and net > gross:
-        add(f"           the headline number overstates the saving by {abs(gross - net):.1f} points")
+        add(f"           output tokens overstate the saving by {abs(gross - net):.1f} points")
     add("")
 
     return "\n".join(lines)
