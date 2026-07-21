@@ -1,6 +1,15 @@
 <div align="center">
 
+<img src="assets/banner.png" alt="An ornate chariot drawn by four horses." width="100%">
+
 # sarathi
+
+<p lang="sa"><strong>योगः कर्मसु कौशलम्</strong></p>
+
+<p><em>“Yoga is skill in action.”</em><br>
+<sub><a href="https://github.com/gita/gita">Bhagavad Gita 2.50</a>, from the public-domain <code>gita/gita</code> dataset</sub></p>
+
+<p><strong>Engineering interpretation:</strong> Plan carefully, then carry that care into execution.</p>
 
 **A reasoning checklist for AI agents, plus a benchmark that tests whether its compact references actually help.**
 
