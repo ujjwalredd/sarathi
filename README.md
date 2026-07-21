@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/banner.png" alt="An ornate chariot drawn by four horses." width="100%">
+<img src="assets/banner.png" alt="An ornate chariot drawn by four horses." width="50%">
 
 # sarathi
 
