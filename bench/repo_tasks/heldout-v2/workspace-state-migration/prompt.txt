@@ -1,0 +1,14 @@
+Repair `state_migration.py` by implementing `migrate_workspace_state(state)` using only the standard library. It accepts strict version 1, 2, or 3 schemas and returns canonical version 3 without mutating or reusing input lists or dictionaries.
+
+General rules:
+
+- Schema dictionaries and lists must be exact built-in types. Wrong container or scalar types raise `TypeError`. Missing or extra keys, unsupported versions, invalid strings or ranges, duplicates, and noncanonical version-3 ordering raise `ValueError`.
+- `version` and `revision` are exact integers, excluding booleans; revision is nonnegative.
+- A display name is an exact string of 1 through 80 code points, with no surrounding whitespace, C0 control, or DEL.
+- A label is an exact string matching `[a-z][a-z0-9_-]{0,15}`.
+
+Version 1 has exactly `version`, `name`, `notify`, and `labels`. `notify` is bool and labels is a unique, not necessarily sorted list. Migrate name to `profile.display_name`, true notify to channel `email`, all labels as enabled, revision 0, and no SMS.
+
+Version 2 has exactly `version`, `profile`, `subscriptions`, `labels`, and `revision`. Profile has exactly `display_name`; subscriptions has exactly bool `email` and `sms`; labels is a dict from valid label to bool. Enabled channels use fixed order email then sms. Keep only enabled labels and sort them. Preserve name and revision.
+
+Version 3 has exactly `version`, `profile`, `channels`, `labels`, and `revision`. Accept it only when canonical: channels contain no duplicates or unknown values and appear in fixed email then sms order; labels are unique and sorted. Rebuild every list and dictionary. Calling the function again must return an equal value.

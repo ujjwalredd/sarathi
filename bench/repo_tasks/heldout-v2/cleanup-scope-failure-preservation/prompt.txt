@@ -1,0 +1,10 @@
+Repair `cleanup_scope.py` without changing its public API. Use only the standard library.
+
+- `defer(callback, *args, **kwargs)` registers a cleanup and returns an opaque token. Active cleanups execute exactly once in strict last-in, first-out order.
+- `cancel(token)` returns `True` only when it cancels an active cleanup. Unknown or already canceled tokens return `False`.
+- `close()` marks the scope closed before callbacks, continues through all callbacks after failures, and is idempotent. The first successful close returns `True`; later calls return `False`, including after a failed first close. Reentrant callback calls to `close()` return `False`.
+- Once closed, `defer`, `cancel`, and entering the scope raise `RuntimeError`.
+- Catch callback `BaseException` failures and raise one `CleanupError`. Its `errors` tuple follows cleanup execution order. `primary` is `None` for direct close or normal context exit.
+- As a context manager, cleanup always runs. With only a body exception, propagate that same exception unchanged.
+- If body and cleanup both fail, raise `CleanupError` with the body exception in `primary`, cleanup failures in `errors`, and the body exception as `__cause__`.
+- Do not suppress body exceptions. No thread-safety guarantee is required.

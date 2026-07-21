@@ -1,10 +1,11 @@
-.PHONY: help build vendor test validate check pilot bench compare compare-codex fidelity codex-baseline codex-auto codex-explicit install uninstall clean all
+.PHONY: help build vendor test validate check pilot bench compare compare-codex repo-bench fidelity codex-baseline codex-auto codex-explicit install uninstall clean all
 
 # Stdlib only, by design: a benchmark that is hard to install is a benchmark
 # nobody re-runs, and re-running is the whole point of this repo.
 PY ?= python3
 JOBS ?= 4
 N ?= 1
+SUITE ?= heldout-v2
 
 help:
 	@echo "sarathi make targets"
@@ -21,6 +22,7 @@ help:
 	@echo "  bench       codebook ablation A-E           (40 x N calls)"
 	@echo "  compare     Claude: control, competitors, deployed Sarathi"
 	@echo "  compare-codex  same comparison through Codex"
+	@echo "  repo-bench  executable hidden-test comparison through Codex"
 	@echo "  codex-baseline  installed-skill control; run before installing Sarathi"
 	@echo "  codex-auto      installed skill with normal automatic routing"
 	@echo "  codex-explicit  installed skill explicitly requested in every prompt"
@@ -29,7 +31,7 @@ help:
 	@echo "  uninstall   remove it"
 	@echo "  clean       remove __pycache__ and local run artifacts"
 	@echo ""
-	@echo "  vars: N=$(N) JOBS=$(JOBS) PY=$(PY)"
+	@echo "  vars: N=$(N) JOBS=$(JOBS) SUITE=$(SUITE) PY=$(PY)"
 
 build:
 	@test -f /tmp/gita_verse.json || curl -sL -o /tmp/gita_verse.json \
@@ -64,6 +66,9 @@ compare:
 compare-codex:
 	$(PY) bench/run.py --backend codex --model gpt-5.5 --arms A F G H \
 		--tasks reasoning minimalism --n $(N) --jobs $(JOBS)
+
+repo-bench:
+	$(PY) bench/repo_bench.py --suite $(SUITE) --arms A F G H --n $(N) --jobs 1
 
 codex-baseline:
 	$(PY) bench/codex_skill.py --condition baseline --expect-skill absent --n $(N) --jobs $(JOBS)

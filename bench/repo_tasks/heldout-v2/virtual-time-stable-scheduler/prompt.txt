@@ -1,0 +1,10 @@
+Repair `deterministic_scheduler.py` without changing its public API. Use only the standard library.
+
+- `DeterministicScheduler(start=0)` begins at finite virtual time `start`. `now` exposes it; `pending` counts callbacks still eligible to execute.
+- Start, delays, and run targets accept finite `int` or `float`, excluding `bool`. Wrong types raise `TypeError`; NaN or infinity raise `ValueError`.
+- `schedule(delay, callback, *args, **kwargs)` requires nonnegative delay and finite resulting due time. It returns an opaque scheduler-owned handle. Compute due time from `now` at scheduling, including inside callbacks.
+- `cancel(handle)` returns `True` only for a pending owned handle. Foreign, arbitrary, running, completed, or canceled handles return `False`.
+- `run_until(target)` rejects targets before `now`. Run ascending due time, with original schedule order breaking ties. Before each callback, set `now` to its due time and remove it from `pending`.
+- Callbacks may schedule or cancel. A zero-delay callback scheduled while processing one timestamp runs in the same `run_until`, after callbacks already scheduled for that timestamp.
+- On success, set `now` exactly to target. If a callback raises any `BaseException`, mark it completed, propagate immediately, keep `now` at its due time, and leave all other callbacks pending.
+- Reentrant `run_until` from a callback raises `RuntimeError`; scheduling and cancellation remain allowed. Each non-canceled callback executes at most once. Ignore return values.

@@ -1,0 +1,12 @@
+Repair `canonical_payload.py` by implementing `canonical_json(value) -> bytes` using only the standard library.
+
+The function provides deterministic UTF-8 JSON for a restricted data model.
+
+- Accept only exact built-in `None`, `bool`, `int`, `str`, `list`, and `dict` values. Reject subclasses, floats, tuples, and every other type with `TypeError`.
+- Integers must be in signed 64-bit range; otherwise raise `ValueError`.
+- Every string and dictionary key must contain only Unicode scalar values. Reject surrogate code points with `ValueError`. Normalize all strings and keys to Unicode NFC.
+- Dictionary keys must be strings. If two original keys normalize to the same value, raise `ValueError`. Sort members by the UTF-8 bytes of normalized keys.
+- Emit no insignificant whitespace. Emit ordinary base-10 integers and lowercase `true`, `false`, and `null`.
+- Escape quote as `\"`, backslash as `\\`, and backspace, tab, LF, form feed, and CR as `\b`, `\t`, `\n`, `\f`, `\r`. Escape every other U+0000 through U+001F as lowercase `\u00xx`. Emit all other Unicode literally in UTF-8.
+- Detect list or dictionary cycles and raise `ValueError`. Reusing one non-cyclic container in multiple locations is valid.
+- Return `bytes`.

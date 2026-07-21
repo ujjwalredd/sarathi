@@ -15,29 +15,26 @@
 
 </div>
 
-Coding agents rarely fail because they cannot write another line of code. They fail because they
-guess what a file contains, fix a test instead of the bug, wander into unrelated refactors, repeat
-an approach that already failed, or declare victory before running the checks.
+Coding agents usually know how to write code. The harder part is staying honest about the work:
+reading the real files, fixing the cause instead of the symptom, respecting risk, and running the
+one check that can prove the change works.
 
-Sarathi is a small skill that pushes an agent in the other direction. It keeps the task in view,
-asks for evidence, matches effort to risk, and verifies the result before making a claim.
+Sarathi is a compact instruction set for that discipline. It is not a framework or runtime. It
+adds no dependency to the project being edited. Its current body is 2,077 bytes and tells an agent
+to seek the lowest-cost verified success, stop after decisive evidence, and say plainly when the
+evidence is missing.
 
-## What changes when Sarathi is active?
+## When is it useful?
 
-Without Sarathi, an agent might see a failing permission test and suggest skipping it. With
-Sarathi, it treats the test as evidence, inspects the authorization path, fixes the behavior, and
-runs the relevant checks.
+Sarathi is meant for agent work where a confident wrong answer is expensive:
 
-The same idea applies elsewhere:
+- repository changes that need inspection and tests
+- bugs where the first fix may only hide the symptom
+- stateful, concurrent, security-sensitive, or irreversible behavior
+- repeated failed attempts that need a new hypothesis
+- recommendations where the final tradeoff belongs to the user
 
-- If the repository is available, read the code before prescribing a patch.
-- If the files are missing, say what needs to be inspected instead of inventing their contents.
-- If two attempts fail, stop repeating them and test a different hypothesis.
-- If the task touches payments, security, production, or user data, slow down and verify more.
-- If the question is simple, answer it simply.
-
-The full skill is only about 620 estimated tokens when invoked. It does not add a framework,
-runtime, or external service to your project.
+For a simple question, it should stay out of the way and answer briefly.
 
 ## Install
 
@@ -48,7 +45,7 @@ claude plugin marketplace add ujjwalredd/sarathi
 claude plugin install sarathi@sarathi
 ```
 
-To install from a local clone:
+From a local clone:
 
 ```bash
 git clone https://github.com/ujjwalredd/sarathi.git
@@ -56,95 +53,119 @@ cd sarathi
 make install
 ```
 
-The published plugin is version `0.2.0`.
+The current plugin version is `0.3.0`.
 
-## Why are there Bhagavad Gita references?
+## Why is the Bhagavad Gita data here?
 
-They are memory cues, not training data and not religious instruction.
+It is a citation library, not a training dataset and not religious instruction.
 
-A short name such as `action-not-fruit (BG 2.47)` points to a longer engineering reminder: solve
-the real problem instead of optimizing the score that represents it. The installed skill uses nine
-of these cues.
+Nine short references act as names for recurring engineering failures. For example,
+`action-not-fruit` reminds the agent to solve the real problem instead of gaming the visible score.
+The operational rule and the verse's literal meaning are stored separately. Sanskrit is kept out
+of the frequently loaded skill prompt.
 
-The source data is bundled so citations are not typed from memory. Sanskrit, literal summaries,
-and the project's engineering readings are kept in separate fields in
-[`skills/sarathi/references/anchors.json`](skills/sarathi/references/anchors.json). The Sanskrit
-does not sit in the frequently loaded prompt.
+The source data prevents quotes and verse numbers from being invented from memory. Exact text,
+literal summaries, project interpretations, and sources live in
+[`skills/sarathi/references/anchors.json`](skills/sarathi/references/anchors.json). Verse data comes
+from the public-domain [`gita/gita`](https://github.com/gita/gita) project. Sarathi claims no
+religious authority.
 
-The Bhagavad Gita is living scripture for many people. Sarathi makes no claim to religious
-authority, and its engineering readings are clearly marked as interpretations created for this
-project. Verse text comes from the public-domain [`gita/gita`](https://github.com/gita/gita)
-dataset.
+## What did the executable benchmark show?
 
-## What did the benchmark show?
+Sarathi became cheaper, but it did not beat everything.
 
-We ran a small comparison against no skill, Caveman, and Ponytail using Codex `gpt-5.5`. The run
-contained 14 synthetic tasks and one sample per task, for 56 isolated calls in total.
+The fresh v2 comparison used Codex `gpt-5.5` at medium reasoning effort, eight repository-repair
+tasks, four arms, and one sample per task. That is 32 model calls. Each agent received the same
+starter file and specification. The grader ran 62 hidden assertions only after the agent exited.
+Independent reference implementations passed all 62 assertions before scoring.
 
-| Arm | Passed | Skill body | Mean answer tokens | Total tokens per pass |
-|---|---:|---:|---:|---:|
-| Control | 13/14 | 0 bytes | 394 | **15,619** |
-| Caveman | 13/14 | 4,774 bytes | 223 | 16,693 |
-| Ponytail | 13/14 | 5,700 bytes | **180** | 16,742 |
-| **Sarathi** | **14/14** | **2,473 bytes** | 242 | 17,074 |
+| Arm | Passed | Skill body | Mean fresh input | Mean cached input | Mean output | Raw tokens per verified pass |
+|---|---:|---:|---:|---:|---:|---:|
+| Control | **8/8** | 0 bytes | 17,161 | **107,920** | 4,067 | **129,148** |
+| Caveman | 7/8 | 4,774 bytes | 19,429 | 130,224 | 4,024 | 175,631 |
+| Ponytail | **8/8** | 5,700 bytes | 25,054 | 173,232 | 4,225 | 202,511 |
+| Sarathi | 7/8 | **2,077 bytes** | **16,894** | 130,144 | **3,971** | 172,581 |
 
-That is encouraging, but it is not a victory lap. Sarathi was the only arm to pass every task and
-its instructions were less than half the size of either competing skill. It also used more total
-tokens per successful answer.
+On this run, Sarathi tied Caveman on correctness and used 1.7% fewer raw tokens per verified pass.
+It used 14.8% fewer than Ponytail, but Ponytail passed one more task. The no-skill control was both
+the most accurate and the cheapest.
 
-The measured pass-rate lead was 7.1 percentage points, with a 95% interval from `-15.2` to `+31.5`.
-The sample is too small to tell whether the lead is real. Codex did not report dollar cost either,
-so this run does not prove cost savings.
+The two failed arms missed different version-1 validation details in the same state-migration
+task. Sarathi returned the wrong exception class because it checked schema shape before checking
+the version type. Caveman preserved version-1 label order when the output required sorting.
 
-In plain English: the skill looks useful and compact, but it has not earned a universal “better”
-claim yet.
+This sample is too small for a victory claim. Sarathi's pass-rate difference from Caveman was
+0 percentage points with a 95% interval from -36.1 to +36.1. Its difference from Ponytail and the
+control was -12.5 points with an interval from -47.1 to +21.5. None was statistically significant.
 
-## Run it yourself
+“Raw tokens” adds fresh input, cached input, and output tokens at equal weight. That is useful for
+reproduction, but it is not a dollar estimate because cached and uncached tokens can have different
+prices, and this Codex run did not report monetary cost. The benchmark therefore does not prove
+dollar savings.
 
-Free repository checks:
+## How the comparison is kept honest
+
+- Sarathi was frozen before the v2 tasks were written.
+- Caveman and Ponytail use exact bodies from pinned upstream commits. Revisions and hashes are in
+  [`bench/vendor/provenance.json`](bench/vendor/provenance.json).
+- Job order is randomized with a recorded seed, then run serially to avoid quota-related timeouts.
+- A temporary Codex home prevents installed Sarathi, Caveman, or Ponytail skills from leaking into
+  the control or another arm.
+- A preflight confirms that candidate commands cannot write to this repository or the normal home
+  directory and cannot access the network.
+- Skipped hidden tests are infrastructure-invalid, never passes.
+- Raw outputs, candidate snapshots, and run metadata stay under ignored `results/`. They are not
+  pushed to GitHub.
+
+This is a local evaluation harness for ordinary model output, not hostile-code isolation. The
+macOS Codex sandbox permits broader filesystem reads than a dedicated VM. Use a disposable VM or
+dedicated account when evaluating untrusted candidates.
+
+## Reproduce it
+
+Free checks:
 
 ```bash
 make check
 ```
 
-Current result: 69 unit tests and 12 repository invariants pass.
+Current result: 80 unit tests and 14 repository invariants pass.
 
-Product comparison through Codex:
-
-```bash
-python bench/run.py \
-  --backend codex \
-  --model gpt-5.5 \
-  --arms A F G H \
-  --tasks reasoning minimalism \
-  --n 1
-```
-
-Product comparison through Claude:
+Preview the scored matrix without model calls:
 
 ```bash
-python bench/run.py \
-  --backend claude \
-  --model opus \
+python bench/repo_bench.py \
+  --suite heldout-v2 \
   --arms A F G H \
-  --tasks reasoning minimalism \
-  --n 1
+  --n 1 \
+  --jobs 1 \
+  --dry-run
 ```
 
-Model calls can cost money, so start with `--n 1`. Each run records its model, CLI version, seed,
-task hashes, prompt hashes, skill hash, outputs, usage, and confidence intervals in local
-`results/`.
+Run it:
 
-Raw runs and generated prompt arms are ignored by Git. The repository keeps the benchmark code,
-tasks, scorer, and exact pinned competitor inputs, which are the pieces needed to reproduce a run.
-Competitor revisions and hashes live in
-[`bench/vendor/provenance.json`](bench/vendor/provenance.json).
+```bash
+make repo-bench N=1
+```
 
-## What is in this repository?
+Model calls can consume quota. The runner records the model, CLI and Python versions, seed, prompt
+hashes, task hashes, skill hash, token usage, outputs, and confidence intervals in local ignored
+artifacts.
 
-- [`skills/sarathi/`](skills/sarathi/) contains the installable skill and its references.
-- [`bench/`](bench/) contains the benchmark runner, tasks, scorer, and pinned comparisons.
-- [`.claude-plugin/`](.claude-plugin/) contains the Claude Code marketplace metadata.
+## What would count as a real win?
+
+A stronger claim needs a preregistered larger suite, repeated samples, no accuracy loss, lower
+measured cost per verified pass, and confidence intervals narrow enough to rule out a practical
+regression. Until then, the honest conclusion is smaller and cheaper than the two competitor
+prompts in this run, tied with Caveman on correctness, and behind Ponytail and the control.
+
+## Repository map
+
+- [`skills/sarathi/`](skills/sarathi/) contains the installable skill and sourced references.
+- [`bench/repo_bench.py`](bench/repo_bench.py) runs isolated executable repository tasks.
+- [`bench/repo_tasks/`](bench/repo_tasks/) contains the final forward-test suite.
+- [`bench/`](bench/) also contains the original reference ablation, scorer, and pinned competitors.
+- [`.claude-plugin/`](.claude-plugin/) contains Claude Code marketplace metadata.
 - [`assets/banner.png`](assets/banner.png) is the banner shown above.
 
 ## License

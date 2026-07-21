@@ -1,0 +1,9 @@
+Repair `revisioned_state.py` without changing its public API. Use only the standard library.
+
+- `VersionedState(initial)` starts at revision 0. `snapshot()` atomically returns `(revision, value)`.
+- `write(value)` always stores the value, increments revision exactly once even when equal, wakes all waiters, and returns the new revision.
+- `compare_and_set(expected_revision, value)` atomically compares and writes. Return `(True, new_revision)` on success or `(False, current_revision)` without mutation on failure.
+- `wait_after(revision, timeout=None)` returns the first available snapshot with revision greater than the argument. Return immediately when one already exists.
+- `timeout=None` waits indefinitely. A finite timeout is a nonnegative number of seconds for the whole operation, measured with a monotonic deadline. Timeout returns `None`; a negative timeout raises `ValueError`.
+- Waiting must tolerate spurious wakeups, wake all eligible waiters, and never lose a write around the transition into waiting.
+- All operations are thread-safe. Values are opaque and must not be copied.

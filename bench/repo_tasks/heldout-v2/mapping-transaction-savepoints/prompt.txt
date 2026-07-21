@@ -1,0 +1,10 @@
+Repair `mapping_transaction.py` without changing its public API. Use only the standard library.
+
+- A new `MappingTransaction` is active immediately. `set` and `delete` changes are visible immediately.
+- `set(key, value)` records the immediately preceding state, then assigns. `delete(key)` records and deletes an existing key. A missing key raises `KeyError` without changing rollback history.
+- Rollback restores values and key absence exactly. Retain values by reference. Repeated changes to one key must roll back correctly.
+- `savepoint()` returns an opaque token tied to this transaction and current journal position.
+- `rollback_to(token)` reverses only later changes, keeps that savepoint valid, and leaves the transaction active. It invalidates every later-created savepoint even when positions match. Foreign, forged, or invalidated tokens raise `ValueError`.
+- `commit()` keeps current contents and closes. `rollback()` restores the construction-time state of all touched keys and closes.
+- As a context manager, normal exit commits and any `BaseException` rolls back. Never suppress exceptions. If explicitly committed or rolled back inside the context, exit does nothing more.
+- After closure, every control method and re-entry raises `RuntimeError`.

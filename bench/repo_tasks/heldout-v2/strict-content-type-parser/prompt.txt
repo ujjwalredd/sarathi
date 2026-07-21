@@ -1,0 +1,13 @@
+Repair `content_type.py` by implementing `parse_content_type(value)` using only the standard library.
+
+The function parses one strict ASCII media type and returns `(type, subtype, parameters)`, where parameters is a tuple of `(name, value)` pairs.
+
+- `value` must be `str`; otherwise raise `TypeError`.
+- Reject non-ASCII, DEL, CR, LF, and all ASCII controls except horizontal tab. Tab is permitted only as optional whitespace outside quoted values. Optional whitespace is space or tab.
+- Grammar: optional whitespace, nonempty type token, optional whitespace, `/`, optional whitespace, nonempty subtype token, then zero or more `; name=value` parameters with optional whitespace around separators, then optional whitespace.
+- Token characters are ASCII letters, digits, and `!#$%&'*+-.^_\`|~`.
+- An unquoted parameter value is a nonempty token. A quoted value may be empty and may contain space or visible ASCII. Backslash-quote and backslash-backslash are the only valid escapes. Tabs, controls, and other escapes inside quotes are invalid.
+- The complete input must match. Reject missing or empty components, empty parameters, trailing semicolons, unterminated quotes, invalid escapes, or extra text.
+- Parameter names are case-insensitive. Reject duplicates after lowercasing.
+- Return type, subtype, and parameter names lowercased. Preserve parameter values after quoted escape decoding. Sort parameters by normalized name.
+- Syntax or value violations raise `ValueError`.

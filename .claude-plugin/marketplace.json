@@ -5,14 +5,14 @@
   },
   "metadata": {
     "description": "Risk-aware reasoning discipline for verified, scoped, and concise agent work, with a reproducible benchmark.",
-    "version": "0.2.0"
+    "version": "0.3.0"
   },
   "plugins": [
     {
       "name": "sarathi",
       "source": "./",
       "description": "Routes effort by risk, checks evidence before claims, limits scope, changes course after failure, verifies work, and keeps handoffs concise.",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "license": "MIT",
       "keywords": ["reasoning", "token-efficiency", "agent-reliability", "benchmark"]
     }

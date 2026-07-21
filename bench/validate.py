@@ -12,6 +12,7 @@ import hashlib
 import os
 import re
 import sys
+from urllib.parse import unquote
 from pathlib import Path
 
 import build_arms
@@ -186,7 +187,7 @@ def check_no_em_dash_in_authored_text() -> list[str]:
         if not path.is_file():
             continue
         relative = path.relative_to(ROOT)
-        if relative.parts[0] in {".git", "results"} or "__pycache__" in relative.parts:
+        if relative.parts[0] in {".git", ".nerd", "results"} or "__pycache__" in relative.parts:
             continue
         if relative.parts[:2] == ("bench", "arms"):
             continue
@@ -365,6 +366,58 @@ def check_plugin_packaging() -> list[str]:
     return errors
 
 
+def check_repository_task_suites() -> list[str]:
+    """Keep the frozen forward-test suite complete."""
+    errors = []
+    expected_counts = {"heldout-v2": 8}
+    for suite, expected_count in expected_counts.items():
+        suite_root = ROOT / "bench/repo_tasks" / suite
+        if not suite_root.is_dir():
+            errors.append(f"bench/repo_tasks/{suite}: missing")
+            continue
+        task_dirs = sorted(path for path in suite_root.iterdir() if path.is_dir())
+        if len(task_dirs) != expected_count:
+            errors.append(
+                f"bench/repo_tasks/{suite}: has {len(task_dirs)} tasks, expected {expected_count}"
+            )
+        for task_dir in task_dirs:
+            prompt = task_dir / "prompt.txt"
+            starter = task_dir / "starter"
+            hidden = task_dir / "hidden_test.py"
+            if not prompt.is_file() or not prompt.read_text(encoding="utf-8").strip():
+                errors.append(f"{task_dir.relative_to(ROOT)}: missing or empty prompt.txt")
+            starter_files = sorted(starter.rglob("*.py")) if starter.is_dir() else []
+            if not starter_files:
+                errors.append(f"{task_dir.relative_to(ROOT)}: no Python starter files")
+            if not hidden.is_file():
+                errors.append(f"{task_dir.relative_to(ROOT)}: missing hidden_test.py")
+            for path in starter_files + ([hidden] if hidden.is_file() else []):
+                try:
+                    compile(path.read_text(encoding="utf-8"), str(path), "exec")
+                except SyntaxError as exc:
+                    errors.append(f"{path.relative_to(ROOT)}: {exc}")
+    return errors
+
+
+def check_readme_local_links() -> list[str]:
+    """Require every repository-relative README link and image to exist."""
+    readme = ROOT / "README.md"
+    if not readme.is_file():
+        return ["README.md: missing"]
+    text = readme.read_text(encoding="utf-8")
+    targets = re.findall(r"!?\[[^\]]*\]\(([^)]+)\)", text)
+    targets += re.findall(r'(?:href|src)="([^"]+)"', text)
+    errors = []
+    for raw in targets:
+        target = raw.strip().split("#", 1)[0]
+        if not target or re.match(r"^[a-z][a-z0-9+.-]*:", target, re.IGNORECASE):
+            continue
+        path = ROOT / unquote(target)
+        if not path.exists():
+            errors.append(f"README.md: missing local target {raw}")
+    return errors
+
+
 CHECKS = [
     ("json parses", check_json_parses),
     ("every verse has a source", check_every_verse_has_a_source),
@@ -378,6 +431,8 @@ CHECKS = [
     ("fidelity probes cover anchors", check_fidelity_probes_cover_anchors),
     ("product and competitor arms are pinned", check_product_and_competitor_arms),
     ("plugin packaging is synchronized", check_plugin_packaging),
+    ("repository task suites are complete", check_repository_task_suites),
+    ("README local links resolve", check_readme_local_links),
 ]
 
 

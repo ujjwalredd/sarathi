@@ -1,0 +1,11 @@
+Repair `coverage_rollup.py` by implementing `aggregate_coverage(spans, *, max_spans, max_groups)` using only the standard library.
+
+- Validate both limits before requesting an iterator or consuming input. Each must be an exact built-in nonnegative `int`; booleans and subclasses raise `TypeError`, negatives raise `ValueError`.
+- Read the input once. Do not call `len`, rewind it, or materialize it before enforcing `max_spans`.
+- Accept at most `max_spans` records. If another record exists, consume exactly that one extra record and immediately raise `OverflowError` without validating it.
+- Each accepted record must be an exact built-in 3-tuple `(resource, start, end)`; otherwise raise `TypeError`.
+- `resource` must be an exact built-in `str`, contain 1 through 32 ASCII characters, and use no non-ASCII. Wrong type raises `TypeError`; invalid content raises `ValueError`.
+- `start` and `end` must be exact built-in integers, excluding booleans. Wrong types raise `TypeError`. Require `0 <= start < end <= 2**63 - 1`; otherwise raise `ValueError`.
+- Allow at most `max_groups` distinct resources. A valid record introducing one group beyond the limit raises `OverflowError`; repeated resources use no extra slot.
+- Treat spans as half-open. For each resource, sort and union intervals, merging overlaps and touching intervals.
+- Return resource entries sorted lexicographically. Each is `(resource, covered_units, merged_intervals)`, where intervals is a tuple of `(start, end)` tuples. Empty input returns `()`.
