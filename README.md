@@ -92,11 +92,42 @@ from memory. The exact verses, plain-language summaries, and sources are in
 public-domain [`gita/gita`](https://github.com/gita/gita) project. Sarathi claims no religious
 authority.
 
-## What the benchmark showed
+## What a real-agent benchmark showed
 
-Sarathi got cheaper. It did not beat everything. The plainest agent won.
+The honest way to measure a skill is to watch a real agent do real work. So I borrowed Ponytail's
+own agentic harness and added Sarathi as an arm. Every run is a headless Claude Code session
+(Haiku 4.5) editing tiangolo's [full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template),
+scored on the `git diff` it leaves behind. Twelve feature tickets for the size test, six adversarial
+tickets for the safety test, the same agent with and without each skill, n=4.
 
-Here is the test. Four setups did the same eight repair tasks, once each, using Codex `gpt-5.5`.
+![Every metric vs the no-skill baseline: sarathi is leaner than baseline on LOC, tokens, cost and time; ponytail cuts the most code; caveman rises above 100%.](assets/benchmark-agentic.svg)
+
+Each arm as a percent of the no-skill baseline (lower is leaner, cheaper, faster):
+
+| vs no-skill baseline | LOC | tokens | cost | time | safe |
+|---|--:|--:|--:|--:|--:|
+| **sarathi** | **-14%** | **-1%** | **-3%** | **-6%** | 96% |
+| ponytail | -41% | +1% | -2% | -9% | 100% |
+| caveman | +13% | +33% | +24% | +25% | 96% |
+
+Sarathi beats the no-skill baseline on every metric and never bloats. It has the lowest raw cost
+and token use of any arm here, and it buries caveman, which is worse than doing nothing on all four
+metrics. But it does not win. Ponytail cuts far more code, because deleting lines is the one thing
+it is built to do. And Sarathi is not perfect on safety: on the six adversarial tickets it scored
+23 of 24, missing once when its `csv-sum` code crashed on a malformed row instead of handling it.
+That is a real miss, so it is reported as one. Baseline and Ponytail held 100%.
+
+Fairness note: all three skills are injected identically as always-on system prompts, and the
+baseline gets none, so any difference is the skill's effect. Six safety tickets are a floor, not a
+proof of security, and n=4 is small. The result stands on its own: leaner than nothing, far better
+than caveman, behind Ponytail on code and one guard short of a clean safety sweep.
+
+## An earlier check on Codex
+
+Before the agentic run above, I ran a smaller single-shot benchmark on Codex `gpt-5.5`. It reached
+a similar conclusion: Sarathi got cheaper but did not beat everything, and the plainest agent won.
+
+Here is that test. Four setups did the same eight repair tasks, once each, using Codex `gpt-5.5`.
 That is 32 runs. Every agent got the same starter file and the same spec. After each agent
 finished, a grader ran 62 hidden checks it had never seen. Those same checks pass on a clean
 reference solution, so they are fair.
