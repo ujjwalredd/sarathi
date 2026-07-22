@@ -55,6 +55,26 @@ make install
 
 The current plugin version is `0.3.0`.
 
+If Claude Code is already open, reload its plugins:
+
+```text
+/reload-plugins
+```
+
+Claude can load Sarathi when a request matches the skill description. To invoke it directly, run:
+
+```text
+/sarathi:sarathi
+```
+
+Check the installed version and component inventory from your terminal:
+
+```bash
+claude plugin details sarathi@sarathi
+```
+
+The output should list version `0.3.0` and `Skills (1) sarathi`.
+
 ## Why is the Bhagavad Gita data here?
 
 It is a citation library, not a training dataset and not religious instruction.
