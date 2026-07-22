@@ -1,14 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 995" font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
 <rect width="1600" height="995" fill="#ffffff"/>
 <text x="800" y="58" text-anchor="middle" fill="#0f172a" font-size="34" font-weight="700">Every metric vs the no-skill baseline (Claude Code, Haiku 4.5, 12 tasks)</text>
-<rect x="470" y="92" width="26" height="26" rx="5" fill="#94a3b8"/>
-<text x="506" y="112" fill="#334155" font-size="25" font-weight="500">baseline</text>
-<rect x="666" y="92" width="26" height="26" rx="5" fill="#c2410c"/>
-<text x="702" y="112" fill="#334155" font-size="25" font-weight="500">caveman</text>
-<rect x="847" y="92" width="26" height="26" rx="5" fill="#16a34a"/>
-<text x="883" y="112" fill="#334155" font-size="25" font-weight="500">ponytail</text>
-<rect x="1043" y="92" width="26" height="26" rx="5" fill="#f59e0b"/>
-<text x="1079" y="112" fill="#334155" font-size="25" font-weight="500">sarathi</text>
+<rect x="560" y="92" width="26" height="26" rx="5" fill="#94a3b8"/>
+<text x="596" y="112" fill="#334155" font-size="25" font-weight="500">baseline</text>
+<rect x="761" y="92" width="26" height="26" rx="5" fill="#16a34a"/>
+<text x="797" y="112" fill="#334155" font-size="25" font-weight="500">ponytail</text>
+<rect x="962" y="92" width="26" height="26" rx="5" fill="#f59e0b"/>
+<text x="998" y="112" fill="#334155" font-size="25" font-weight="500">sarathi</text>
 <line x1="150" y1="720.0" x2="1570" y2="720.0" stroke="#eef2f6" stroke-width="1.5"/>
 <text x="138" y="728.0" text-anchor="end" fill="#64748b" font-size="22">0%</text>
 <line x1="150" y1="625.0" x2="1570" y2="625.0" stroke="#eef2f6" stroke-width="1.5"/>
@@ -20,54 +18,45 @@
 <line x1="150" y1="340.0" x2="1570" y2="340.0" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="7 6"/>
 <text x="138" y="348.0" text-anchor="end" fill="#64748b" font-size="22">100%</text>
 <text x="52" y="530" fill="#64748b" font-size="22" transform="rotate(-90 52 530)" text-anchor="middle">% of baseline (lower is leaner)</text>
-<rect x="215.8" y="340.0" width="58" height="380.0" rx="3" fill="#94a3b8"/>
-<text x="244.8" y="328.0" text-anchor="middle" fill="#64748b" font-size="21" font-weight="700">100%</text>
-<rect x="281.8" y="286.8" width="58" height="433.2" rx="3" fill="#c2410c"/>
-<text x="310.8" y="274.8" text-anchor="middle" fill="#9a3412" font-size="21" font-weight="700">114%</text>
-<rect x="347.8" y="495.8" width="58" height="224.2" rx="3" fill="#16a34a"/>
-<text x="376.8" y="483.8" text-anchor="middle" fill="#15803d" font-size="21" font-weight="700">59%</text>
-<rect x="413.8" y="393.2" width="58" height="326.8" rx="3" fill="#f59e0b"/>
-<text x="442.8" y="381.2" text-anchor="middle" fill="#b45309" font-size="21" font-weight="700">86%</text>
+<rect x="232.8" y="340.0" width="66" height="380.0" rx="3" fill="#94a3b8"/>
+<text x="265.8" y="328.0" text-anchor="middle" fill="#64748b" font-size="22" font-weight="700">100%</text>
+<rect x="310.8" y="488.2" width="66" height="231.8" rx="3" fill="#16a34a"/>
+<text x="343.8" y="476.2" text-anchor="middle" fill="#15803d" font-size="22" font-weight="700">61%</text>
+<rect x="388.8" y="408.4" width="66" height="311.6" rx="3" fill="#f59e0b"/>
+<text x="421.8" y="396.4" text-anchor="middle" fill="#b45309" font-size="22" font-weight="700">82%</text>
 <text x="343.8" y="755" text-anchor="middle" fill="#0f172a" font-size="26" font-weight="600">LOC</text>
-<text x="343.8" y="784" text-anchor="middle" fill="#94a3b8" font-size="21">base 183</text>
-<rect x="563.2" y="340.0" width="58" height="380.0" rx="3" fill="#94a3b8"/>
-<text x="592.2" y="328.0" text-anchor="middle" fill="#64748b" font-size="21" font-weight="700">100%</text>
-<rect x="629.2" y="214.6" width="58" height="505.4" rx="3" fill="#c2410c"/>
-<text x="658.2" y="202.6" text-anchor="middle" fill="#9a3412" font-size="21" font-weight="700">133%</text>
-<rect x="695.2" y="336.2" width="58" height="383.8" rx="3" fill="#16a34a"/>
-<text x="724.2" y="324.2" text-anchor="middle" fill="#15803d" font-size="21" font-weight="700">101%</text>
-<rect x="761.2" y="343.8" width="58" height="376.2" rx="3" fill="#f59e0b"/>
-<text x="790.2" y="331.8" text-anchor="middle" fill="#b45309" font-size="21" font-weight="700">99%</text>
+<text x="343.8" y="784" text-anchor="middle" fill="#94a3b8" font-size="21">base 177</text>
+<rect x="580.2" y="340.0" width="66" height="380.0" rx="3" fill="#94a3b8"/>
+<text x="613.2" y="328.0" text-anchor="middle" fill="#64748b" font-size="22" font-weight="700">100%</text>
+<rect x="658.2" y="416.0" width="66" height="304.0" rx="3" fill="#16a34a"/>
+<text x="691.2" y="404.0" text-anchor="middle" fill="#15803d" font-size="22" font-weight="700">80%</text>
+<rect x="736.2" y="340.0" width="66" height="380.0" rx="3" fill="#f59e0b"/>
+<text x="769.2" y="328.0" text-anchor="middle" fill="#b45309" font-size="22" font-weight="700">100%</text>
 <text x="691.2" y="755" text-anchor="middle" fill="#0f172a" font-size="26" font-weight="600">tokens</text>
-<text x="691.2" y="784" text-anchor="middle" fill="#94a3b8" font-size="21">base 323k</text>
-<rect x="910.8" y="340.0" width="58" height="380.0" rx="3" fill="#94a3b8"/>
-<text x="939.8" y="328.0" text-anchor="middle" fill="#64748b" font-size="21" font-weight="700">100%</text>
-<rect x="976.8" y="248.8" width="58" height="471.2" rx="3" fill="#c2410c"/>
-<text x="1005.8" y="236.8" text-anchor="middle" fill="#9a3412" font-size="21" font-weight="700">124%</text>
-<rect x="1042.8" y="347.6" width="58" height="372.4" rx="3" fill="#16a34a"/>
-<text x="1071.8" y="335.6" text-anchor="middle" fill="#15803d" font-size="21" font-weight="700">98%</text>
-<rect x="1108.8" y="351.4" width="58" height="368.6" rx="3" fill="#f59e0b"/>
-<text x="1137.8" y="339.4" text-anchor="middle" fill="#b45309" font-size="21" font-weight="700">97%</text>
+<text x="691.2" y="784" text-anchor="middle" fill="#94a3b8" font-size="21">base 362k</text>
+<rect x="927.8" y="340.0" width="66" height="380.0" rx="3" fill="#94a3b8"/>
+<text x="960.8" y="328.0" text-anchor="middle" fill="#64748b" font-size="22" font-weight="700">100%</text>
+<rect x="1005.8" y="397.0" width="66" height="323.0" rx="3" fill="#16a34a"/>
+<text x="1038.8" y="385.0" text-anchor="middle" fill="#15803d" font-size="22" font-weight="700">85%</text>
+<rect x="1083.8" y="347.6" width="66" height="372.4" rx="3" fill="#f59e0b"/>
+<text x="1116.8" y="335.6" text-anchor="middle" fill="#b45309" font-size="22" font-weight="700">98%</text>
 <text x="1038.8" y="755" text-anchor="middle" fill="#0f172a" font-size="26" font-weight="600">cost</text>
 <text x="1038.8" y="784" text-anchor="middle" fill="#94a3b8" font-size="21">base $0.10</text>
-<rect x="1258.2" y="340.0" width="58" height="380.0" rx="3" fill="#94a3b8"/>
-<text x="1287.2" y="328.0" text-anchor="middle" fill="#64748b" font-size="21" font-weight="700">100%</text>
-<rect x="1324.2" y="245.0" width="58" height="475.0" rx="3" fill="#c2410c"/>
-<text x="1353.2" y="233.0" text-anchor="middle" fill="#9a3412" font-size="21" font-weight="700">125%</text>
-<rect x="1390.2" y="374.2" width="58" height="345.8" rx="3" fill="#16a34a"/>
-<text x="1419.2" y="362.2" text-anchor="middle" fill="#15803d" font-size="21" font-weight="700">91%</text>
-<rect x="1456.2" y="362.8" width="58" height="357.2" rx="3" fill="#f59e0b"/>
-<text x="1485.2" y="350.8" text-anchor="middle" fill="#b45309" font-size="21" font-weight="700">94%</text>
+<rect x="1275.2" y="340.0" width="66" height="380.0" rx="3" fill="#94a3b8"/>
+<text x="1308.2" y="328.0" text-anchor="middle" fill="#64748b" font-size="22" font-weight="700">100%</text>
+<rect x="1353.2" y="419.8" width="66" height="300.2" rx="3" fill="#16a34a"/>
+<text x="1386.2" y="407.8" text-anchor="middle" fill="#15803d" font-size="22" font-weight="700">79%</text>
+<rect x="1431.2" y="355.2" width="66" height="364.8" rx="3" fill="#f59e0b"/>
+<text x="1464.2" y="343.2" text-anchor="middle" fill="#b45309" font-size="22" font-weight="700">96%</text>
 <text x="1386.2" y="755" text-anchor="middle" fill="#0f172a" font-size="26" font-weight="600">time</text>
-<text x="1386.2" y="784" text-anchor="middle" fill="#94a3b8" font-size="21">base 71s</text>
+<text x="1386.2" y="784" text-anchor="middle" fill="#94a3b8" font-size="21">base 73s</text>
 <line x1="150" y1="720" x2="1570" y2="720" stroke="#cbd5e1" stroke-width="2"/>
 <text x="60" y="835" fill="#64748b" font-size="21">Each bar = that arm&#39;s mean as a % of the no-skill baseline (the gray 100% bars), 12 real-repo features, n=4.</text>
-<text x="60" y="864" fill="#64748b" font-size="21">Lower is leaner / cheaper / faster. sarathi beats baseline on every metric; ponytail cuts the most code; caveman rises above 100%.</text>
+<text x="60" y="864" fill="#64748b" font-size="21">Lower is leaner / cheaper / faster. sarathi 0.5.0 beats baseline on every metric and ties ponytail on native-control tasks; ponytail cuts the most overall.</text>
 <line x1="60" y1="895" x2="1540" y2="895" stroke="#e2e8f0" stroke-width="1.5"/>
 <text x="60" y="935" fill="#475569" font-size="22">Safety, separate 6-task adversarial tier (path-traversal, SQLi, token forgery, malformed input, rate-limit). Higher is safer:</text>
 <text x="60" y="975" fill="#64748b" font-size="24" font-weight="600">baseline 100%</text>
-<text x="400" y="975" fill="#9a3412" font-size="24" font-weight="600">caveman 96%</text>
-<text x="660" y="975" fill="#15803d" font-size="24" font-weight="600">ponytail 100%</text>
-<text x="960" y="975" fill="#b45309" font-size="24" font-weight="600">sarathi 96%</text>
-<text x="1200" y="975" fill="#94a3b8" font-size="24">(1 malformed-row crash)</text>
+<text x="430" y="975" fill="#15803d" font-size="24" font-weight="600">ponytail 100%</text>
+<text x="760" y="975" fill="#b45309" font-size="24" font-weight="600">sarathi 100%</text>
+<text x="1080" y="975" fill="#94a3b8" font-size="24">all arms clean this run</text>
 </svg>

@@ -1,7 +1,7 @@
 {
   "name": "sarathi",
-  "version": "0.5.0",
-  "description": "A compact discipline for scoped, verified, and concise coding-agent work.",
+  "version": "0.6.0",
+  "description": "Compact guidance for minimal, verified coding-agent changes.",
   "author": {
     "name": "Sarathi contributors",
     "url": "https://github.com/ujjwalredd/sarathi"
@@ -18,8 +18,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Sarathi",
-    "shortDescription": "Verified discipline for coding agents",
-    "longDescription": "Keep coding-agent work scoped, evidence-based, risk-aware, and concise.",
+    "shortDescription": "Minimal, verified coding changes",
+    "longDescription": "Keep coding-agent changes small, safe, and verified.",
     "developerName": "Sarathi contributors",
     "category": "Developer Tools",
     "capabilities": [],

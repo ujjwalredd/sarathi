@@ -1,4 +1,4 @@
 interface:
   display_name: "Sarathi"
-  short_description: "Reasoning discipline for reliable agent work"
-  default_prompt: "Use $sarathi to solve this task with bounded reasoning and verified evidence."
+  short_description: "Minimal, verified coding changes"
+  default_prompt: "Use $sarathi to make the smallest verified change."

@@ -1,8 +1,9 @@
 {
   "schema_version": 1,
-  "registered_at_utc": "2026-07-22T15:18:57Z",
+  "registered_at_utc": "2026-07-22T20:36:25Z",
   "purpose": "Provider-port of Ponytail's current 304-cell agentic benchmark to Codex GPT-5.5.",
-  "development_disclosure": "Sarathi was redesigned after seeing earlier Claude results on these public tasks. This run tests whether the frozen redesign transfers to GPT-5.5. It is not a blind holdout.",
+  "development_disclosure": "Sarathi was redesigned after seeing earlier Claude results and Ponytail's public studies on these tasks. Version 0.6.0 was also checked on three fresh local forward tasks. This run tests transfer to GPT-5.5, not a blind holdout.",
+  "refreeze_reason": "The 0.5.0 run was infrastructure-invalid before aggregation. Version 0.6.0 removes repeated general advice while retaining the concrete native-control, shared-caller, and safety instructions supported by prior evidence.",
   "upstream": {
     "repository": "https://github.com/DietrichGebert/ponytail",
     "revision": "16f29800fd2681bdf24f3eb4ccffe38be3baec6b",
@@ -11,14 +12,17 @@
   },
   "adapter": {
     "path": "bench/agentic_gpt_runner.py",
-    "run_gpt_py_sha256": "dacd05fe5e61a4e6cc19976c0d12601dcfd38a488363f23a89bd633b0c10a40f",
+    "run_gpt_py_sha256": "c1f5ba153548af1e6ffc9fe1440652663ce6f4811d3e5ac23540ece54eb81cb9",
     "changes": [
       "Use isolated Codex exec sessions instead of Claude Code sessions.",
       "Prepend each skill body to the same task prompt and disable installed plugins and user rules.",
       "Read token usage from Codex JSONL and estimate API-equivalent cost from published token prices.",
       "Keep Ponytail's workspaces, tasks, scorers, LOC accounting, timeouts, checkpointing, and aggregation code.",
       "Abort and tree-kill active cells after three infrastructure failures instead of spending through a broken run.",
-      "Forbid project execution and package-manager checks because Ponytail's Claude harness disables Bash."
+      "Forbid project execution and package-manager checks because Ponytail's Claude harness disables Bash.",
+      "Give every cell a temporary auth-only CODEX_HOME so model caches and installed Codex skills cannot cross-contaminate workers.",
+      "Disable user skills discovered under .agents and reject any cell whose command trace reads an external skill path.",
+      "Disable shell snapshots to avoid unnecessary shared-shell startup work."
     ]
   },
   "fixture": {
@@ -48,13 +52,27 @@
       "sha256": "4e7382857d47d796bd20454c6d10318293fd3724efef6cc1e90cdf589e765e24"
     },
     "sarathi": {
-      "version": "0.5.0",
-      "source_bytes": 2882,
-      "source_sha256": "be79ada182ef233e6ae8a5647495317d9481e430e1b077dea9894d5d535b5b5d",
-      "body_bytes": 2530,
-      "body_sha256": "417627ff103af5dfb98cb2ac94c0d0042498914afb168d0bc35c7228937357fd"
+      "version": "0.6.0",
+      "source_bytes": 2180,
+      "source_sha256": "25076a8cf39b6f42e8bba38a1bd18a903e8e4bf2178dc01937af30df37aaa0c1",
+      "body_bytes": 1932,
+      "body_sha256": "ef3303b13cd09cf4d9ca1a9fa7b7a5d121a6ec6e5802927a3fe2c670d9c7e189"
     }
   },
+  "forward_tests": [
+    {
+      "task": "native month input",
+      "result": "Reused the existing Input component with type=month and passed focused static checks without adding a dependency."
+    },
+    {
+      "task": "shared debit root cause",
+      "result": "Fixed the shared debit path instead of only the named transfer caller; the focused overdraft test passed."
+    },
+    {
+      "task": "inventory mutation guard",
+      "result": "Rejected invalid reservations before mutation; focused boundary and unchanged-state checks passed."
+    }
+  ],
   "feature_tasks": [
     "tmpl-fe-datepicker",
     "tmpl-fe-colorpicker",
@@ -119,6 +137,19 @@
       "terminated_cells": 1,
       "error": "You hit your spend cap set by the owner of your workspace. Ask an owner to increase your spend cap to continue.",
       "notes": "No metric or comparison was computed. Partial cells are unbalanced across tasks and arms. The final skill was shortened from 2951 to 2530 body bytes using the user's pre-run Claude analysis, not partial GPT outcomes. The adapter gained fail-fast process cleanup and a stricter no-execution prompt before refreezing."
+    },
+    {
+      "started_at_utc": "2026-07-22T20:31:29Z",
+      "workers": 35,
+      "status": "infrastructure-invalid and excluded",
+      "started_workspaces": 54,
+      "zero_returncode_cells": 16,
+      "checkpointed_cells": 19,
+      "spend_cap_files": 4,
+      "terminated_or_nonzero_cells": 38,
+      "external_skill_contaminated_workspaces": 43,
+      "error": "You hit your spend cap set by the owner of your workspace. Ask an owner to increase your spend cap to continue.",
+      "notes": "No metric or comparison was computed. The run exposed two adapter defects: workers shared the user's Codex home and non-Sarathi arms could auto-read the globally installed Sarathi skill. The refrozen adapter now uses per-cell auth-only Codex homes, disables user skills, and rejects external skill reads."
     }
   ],
   "integrity_rules": [

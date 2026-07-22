@@ -41,15 +41,23 @@ jobs:
       - name: Install pinned Claude Code CLI
         run: npm install --global @anthropic-ai/claude-code@2.1.206
       - name: Validate plugin manifests
-        run: claude plugin validate .
+        run: claude plugin validate --strict .
       - name: Smoke-test local marketplace install
         env:
           CLAUDE_CONFIG_DIR: ${{ runner.temp }}/claude-clean
         run: |
           make install
           claude plugin details sarathi@sarathi | tee "${RUNNER_TEMP}/sarathi-plugin.txt"
-          grep -F "sarathi 0.4.0" "${RUNNER_TEMP}/sarathi-plugin.txt"
-          grep -F "Skills (1)  sarathi" "${RUNNER_TEMP}/sarathi-plugin.txt"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          expected = json.loads(Path(".claude-plugin/plugin.json").read_text())["version"]
+          details = (Path(os.environ["RUNNER_TEMP"]) / "sarathi-plugin.txt").read_text()
+          assert f"sarathi {expected}" in details, details
+          assert "Skills (1)  sarathi" in details, details
+          PY
 
   codex-plugin:
     runs-on: ubuntu-latest
@@ -68,8 +76,24 @@ jobs:
           codex plugin marketplace add . --json
           codex plugin add sarathi@sarathi --json
           codex plugin list --json | tee "${RUNNER_TEMP}/sarathi-codex-plugin.json"
-          grep -F '"name": "sarathi"' "${RUNNER_TEMP}/sarathi-codex-plugin.json"
-          grep -F '"version": "0.4.0"' "${RUNNER_TEMP}/sarathi-codex-plugin.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          expected = json.loads(Path(".codex-plugin/plugin.json").read_text())["version"]
+          payload = json.loads(
+              (Path(os.environ["RUNNER_TEMP"]) / "sarathi-codex-plugin.json").read_text()
+          )
+          installed = [
+              plugin for plugin in payload["installed"]
+              if plugin.get("name") == "sarathi"
+          ]
+          assert len(installed) == 1, payload
+          assert installed[0]["version"] == expected, installed[0]
+          assert installed[0]["installed"] is True, installed[0]
+          assert installed[0]["enabled"] is True, installed[0]
+          PY
 
   reproducible:
     runs-on: ubuntu-latest

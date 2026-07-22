@@ -1,7 +1,7 @@
 {
   "name": "sarathi",
-  "version": "0.5.0",
-  "description": "Risk-aware reasoning discipline for verified, scoped, and concise agent work, with a reproducible benchmark.",
+  "version": "0.6.0",
+  "description": "Compact guidance for minimal, verified coding-agent changes.",
   "author": {
     "name": "sarathi contributors"
   },

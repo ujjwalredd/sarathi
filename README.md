@@ -20,7 +20,7 @@ the real files instead of guessing, fix the actual bug instead of hiding it, slo
 work is risky, and run the one check that proves the change works.
 
 Sarathi is a small set of instructions for exactly that. It is not a framework or a program you
-run. It adds nothing to your project. The instruction body loaded into an agent is 2,530 bytes. It
+run. It adds nothing to your project. The instruction body loaded into an agent is 1,932 bytes. It
 asks the agent to find the cheapest verified solution, stop when the evidence is clear, and say
 plainly when the evidence is missing.
 
@@ -53,10 +53,14 @@ cd sarathi
 make install
 ```
 
-The current plugin version is `0.5.0`.
+The current plugin version is `0.6.0`.
 
 The marketplace passes Claude Code's strict validator and installs from a clean local
 configuration on Claude Code 2.1.206. That check does not make a model call.
+
+On that CLI, 0.6.0 has a projected cost of about 57 always-on tokens and 480 tokens when invoked.
+The same estimates for 0.5.0 were 83 and 630, so the metadata and prompt rewrite cut the projections
+by 31% and 24%. These are CLI estimates, not benchmark results.
 
 If Claude Code is already open, reload its plugins:
 
@@ -76,7 +80,7 @@ To check the installed version:
 claude plugin details sarathi@sarathi
 ```
 
-It should show version `0.5.0` and `Skills (1) sarathi`.
+It should show version `0.6.0` and `Skills (1) sarathi`.
 
 ## Why the Bhagavad Gita?
 
@@ -97,28 +101,31 @@ authority.
 
 ## What the agentic benchmark has shown
 
-The chart below is a historical result for Sarathi 0.4.0. It used Ponytail's agentic harness with
-Claude Haiku 4.5: 12 feature tickets, six adversarial safety tickets, four arms, and four runs per
-cell. Every cell got an isolated workspace and the skills were injected the same way.
+This is the current result for Sarathi 0.6.0. It uses Ponytail's agentic harness with Claude Haiku
+4.5: 12 feature tickets and six adversarial safety tickets, run as real headless Claude Code
+sessions editing tiangolo's full-stack-fastapi-template and scored on the git diff. Three arms,
+baseline, Ponytail, and Sarathi, four runs per cell, each in an isolated workspace with the skills
+injected the same way.
 
-![Every metric vs the no-skill baseline: sarathi is leaner than baseline on LOC, tokens, cost and time; ponytail cuts the most code; caveman rises above 100%.](assets/benchmark-agentic.svg)
+![Every metric vs the no-skill baseline: sarathi is leaner than baseline on LOC, tokens, cost and time and ties ponytail on native-control tasks; ponytail cuts the most code overall.](assets/benchmark-agentic.svg)
 
 Each arm as a percent of the no-skill baseline. Lower is leaner, cheaper, or faster.
 
 | vs no-skill baseline | LOC | tokens | cost | time | safe |
 |---|--:|--:|--:|--:|--:|
-| **sarathi** | **-14%** | **-1%** | **-3%** | **-6%** | 96% |
-| ponytail | -41% | +1% | -2% | -9% | 100% |
-| caveman | +13% | +33% | +24% | +25% | 96% |
+| **sarathi** | **-18%** | **0%** | **-2%** | **-4%** | 100% |
+| ponytail | -39% | -20% | -16% | -21% | 100% |
 
-Sarathi 0.4.0 beat the no-skill baseline on the four efficiency metrics and used fewer tokens and
-less money than the other skill arms in this run. It still did not win. Ponytail cut much more
-code, and Sarathi missed one `csv-sum` safety case by crashing on a malformed row. Baseline and
-Ponytail held 100% safety.
+Sarathi 0.6.0 beat the no-skill baseline on every efficiency metric and stayed 100 percent safe. Its
+concrete native-control rules pulled the date and color picker tasks down to a tie with Ponytail at
+about 24 lines each, where an earlier abstract version had produced 200 or more. But it did not win.
+Ponytail cut much more code on the complex components, and in this particular run an unusually
+verbose baseline widened Ponytail's token, cost, and time lead. Across five runs the direction is
+consistent: Sarathi is the smaller, safe all-rounder that beats doing nothing, and Ponytail, a
+dedicated code minimizer, stays ahead on raw leanness.
 
-This chart does not measure the current 0.5.0 skill. That version is shorter and more concrete than
-the larger experimental prompt that regressed on date and color picker tasks. It names the native
-HTML controls directly and keeps the safety rule that rejects invalid state before mutation.
+Caveman was not run in this comparison. In the earlier 0.4.0 run it was worse than the no-skill
+baseline on every metric.
 
 ### Current 304-cell GPT-5.5 run
 
@@ -128,11 +135,17 @@ Ponytail's 19-task harness to isolated Codex `gpt-5.5` sessions and runs 12 feat
 safety tasks across baseline, Caveman, Ponytail, and Sarathi. Four repetitions produce 304 cells,
 with up to 35 cells running at once.
 
-There is no valid result yet. The first full attempt on July 22, 2026 hit the Codex workspace
-owner's spend cap. It started 177 cells, but only 41 model cells completed before spend-cap errors
-made the run invalid. Those partial cells are unbalanced across tasks and arms, so none of their
-metrics appear here. The runner now stops after three infrastructure failures and terminates only
-the active benchmark process groups.
+There is no valid result yet. The first full attempt, using Sarathi 0.5.0 on July 22, 2026, hit the
+Codex workspace owner's spend cap. It started 177 cells, but only 41 model cells completed before
+spend-cap errors made the run invalid. Those partial cells are unbalanced across tasks and arms, so
+none of their metrics appear here. The runner now stops after three infrastructure failures and
+terminates only the active benchmark process groups. Sarathi 0.6.0 has not completed a scored run.
+
+A second attempt started Sarathi 0.6.0 but is also excluded. The spend cap stopped it after 19
+checkpointed cells, and its traces showed that globally installed Codex skills could be discovered
+inside supposedly isolated arms. The adapter now gives every cell a separate auth-only Codex home,
+disables user skills, and rejects any cell that reads an external skill path. No partial number from
+either attempt is used as a result.
 
 This is a provider port, not an exact reproduction of the Claude result. The tasks, scorers,
 workspaces, LOC accounting, repetitions, and arms stay fixed. The runner changes from Claude Code
@@ -254,7 +267,7 @@ python3 /tmp/ponytail-agentic/benchmarks/agentic/run_gpt.py \
 For this run, a win means all 304 cells are valid, Sarathi matches or beats Ponytail on both safety
 scores, and Sarathi is lower on feature LOC, total tokens, API-equivalent cost, and wall time. If
 one of those conditions fails, it is not a sweep. Since the current run did not complete, Sarathi
-0.5.0 has not earned that claim.
+0.6.0 has not earned that claim.
 
 ## Repository map
 

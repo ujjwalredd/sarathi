@@ -4,7 +4,7 @@
 Derived from Dietrich Gebert's Ponytail runner at commit 16f2980 under the MIT License.
 Copy this file beside the upstream tasks.py as benchmarks/agentic/run_gpt.py.
 
-Runs each (task x arm x model) through a real headless Claude Code session in an isolated
+Runs each (task x arm x model) through a real headless Codex session in an isolated
 temp workspace seeded with a starter file, then scores the produced files deterministically
 for CORRECTNESS and SAFETY -- the axis the single-shot promptfoo bench was blind to.
 
@@ -46,6 +46,7 @@ MODELS = {"gpt-5.5": "gpt-5.5"}
 FRESH_INPUT_USD_M = 5.0
 CACHED_INPUT_USD_M = 0.5
 OUTPUT_USD_M = 30.0
+ORIGINAL_CODEX_HOME = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex"))
 
 # Skills are plugins activated by a SessionStart hook. To test exactly one at a time we exclude the
 # user's globally-enabled plugins (--setting-sources project,local) and load one plugin from its
@@ -269,17 +270,30 @@ def chat_code_loc(text):
             if not s.startswith(("#", "//", "*", "/*", "*/")): code += 1
     return total, code
 
+def _disabled_user_skills_config():
+    """Disable user skills outside CODEX_HOME so raw benchmark arms cannot be contaminated."""
+    root = Path.home() / ".agents" / "skills"
+    paths = sorted(root.rglob("SKILL.md")) if root.is_dir() else []
+    entries = ", ".join(
+        f"{{ path = {json.dumps(str(path.resolve()))}, enabled = false }}" for path in paths
+    )
+    return f"skills.config=[{entries}]"
+
 def score_workspace(task_id, arm, model, workdir: Path):
     meta, result_text = {"infra_valid": False}, ""
     cj = workdir / "_codex.jsonl"
     if cj.exists():
         try:
-            usage, messages, turns = {}, [], 0
+            usage, messages, turns, external_skill_reads = {}, [], 0, []
             for line in cj.read_text(encoding="utf-8").splitlines():
                 event = json.loads(line)
                 if event.get("type") == "item.completed":
                     item = event.get("item") or {}
                     if item.get("type") == "agent_message": messages.append(str(item.get("text", "")))
+                    if item.get("type") == "command_execution":
+                        command = str(item.get("command", "")).replace("\\", "/")
+                        if "/.codex/skills/" in command or "/.agents/skills/" in command:
+                            external_skill_reads.append(command[:300])
                 elif event.get("type") == "turn.completed":
                     turns += 1
                     if isinstance(event.get("usage"), dict): usage = event["usage"]
@@ -290,10 +304,13 @@ def score_workspace(task_id, arm, model, workdir: Path):
             duration_path = workdir / "_duration_ms.txt"
             returncode_path = workdir / "_returncode.txt"
             returncode = int(returncode_path.read_text()) if returncode_path.exists() else -1
+            infra_valid = returncode == 0 and bool(usage) and bool(messages) and not external_skill_reads
             meta = {"cost": cost, "duration_ms": int(duration_path.read_text()) if duration_path.exists() else None,
                     "turns": turns, "denials": 0, "out_tokens": output, "in_tokens": fresh,
-                    "cache_tokens": cached, "infra_valid": returncode == 0 and bool(usage) and bool(messages),
-                    "returncode": returncode}
+                    "cache_tokens": cached, "infra_valid": infra_valid, "returncode": returncode,
+                    "external_skill_reads": external_skill_reads}
+            if external_skill_reads:
+                meta["infra_error"] = "external skill contamination"
             result_text = messages[-1] if messages else ""
         except Exception as exc:
             meta = {"infra_valid": False, "infra_error": str(exc)[:200]}
@@ -340,8 +357,10 @@ def run_cell(task_id, arm, model, workdir: Path):
                     "PYTHONDONTWRITEBYTECODE": "1"}
     assignments = ", ".join(f"{key} = {json.dumps(value)}" for key, value in shell_values.items())
     cmd = [codex, "exec", "--json", "--ephemeral", "--ignore-user-config", "--ignore-rules",
-           "--disable", "plugins", "--skip-git-repo-check", "--sandbox", "workspace-write",
+           "--disable", "plugins", "--disable", "shell_snapshot", "--skip-git-repo-check",
+           "--sandbox", "workspace-write",
            "--model", MODELS[model], "--config", 'model_reasoning_effort="medium"',
+           "--config", _disabled_user_skills_config(),
            "--config", 'shell_environment_policy.inherit="none"', "--config",
            f"shell_environment_policy.set={{{assignments}}}", "--cd", str(workdir), "-"]
     prompt_path = scratch / "prompt.txt"
@@ -349,10 +368,19 @@ def run_cell(task_id, arm, model, workdir: Path):
     out_path, err_path = workdir / "_codex.jsonl", workdir / "_codex.stderr.txt"
     # stdout goes to a file, never a PIPE. A timed-out process is killed by its isolated group.
     try:
-        with open(prompt_path, "rb") as si, open(out_path, "wb") as so, open(err_path, "wb") as se:
+        with tempfile.TemporaryDirectory(prefix="sarathi-codex-home-") as home_dir, \
+             open(prompt_path, "rb") as si, open(out_path, "wb") as so, open(err_path, "wb") as se:
+            isolated_home = Path(home_dir)
+            auth_path = ORIGINAL_CODEX_HOME / "auth.json"
+            if auth_path.is_file():
+                copied_auth = isolated_home / "auth.json"
+                shutil.copy2(auth_path, copied_auth)
+                copied_auth.chmod(0o600)
+            process_env = os.environ.copy()
+            process_env["CODEX_HOME"] = str(isolated_home)
             started = time.monotonic()
             proc = subprocess.Popen(cmd, cwd=str(workdir), stdin=si, stdout=so, stderr=se,
-                                    start_new_session=(os.name != "nt"))
+                                    env=process_env, start_new_session=(os.name != "nt"))
             with ACTIVE_LOCK:
                 ACTIVE_PROCS.add(proc)
             try:

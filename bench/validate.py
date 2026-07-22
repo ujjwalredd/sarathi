@@ -338,6 +338,7 @@ def check_plugin_packaging() -> list[str]:
     codex_marketplace_path = ROOT / ".agents/plugins/marketplace.json"
     citation_path = ROOT / "CITATION.cff"
     codex_path = ROOT / "skills/sarathi/agents/openai.yaml"
+    workflow_path = ROOT / ".github/workflows/ci.yml"
     for path in (
         plugin_path,
         marketplace_path,
@@ -345,6 +346,7 @@ def check_plugin_packaging() -> list[str]:
         codex_marketplace_path,
         citation_path,
         codex_path,
+        workflow_path,
     ):
         if not path.is_file():
             errors.append(f"{path.relative_to(ROOT)}: missing")
@@ -385,6 +387,11 @@ def check_plugin_packaging() -> list[str]:
     for required in ('display_name: "Sarathi"', "$sarathi"):
         if required not in codex:
             errors.append(f"skills/sarathi/agents/openai.yaml missing {required}")
+    workflow = workflow_path.read_text(encoding="utf-8")
+    if re.search(r"sarathi\s+\d+\.\d+\.\d+", workflow, re.IGNORECASE):
+        errors.append("CI must read the expected Sarathi version from the plugin manifest")
+    if re.search(r"['\"]version['\"]\s*:\s*['\"]\d+\.\d+\.\d+", workflow):
+        errors.append("CI must not duplicate a literal Sarathi plugin version")
     return errors
 
 
