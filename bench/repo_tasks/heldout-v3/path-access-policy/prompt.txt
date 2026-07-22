@@ -1,0 +1,5 @@
+Fix `path_policy.py` so `resolve_allowed_path(root, requested)` safely resolves a repository-relative path under an allowed root.
+
+The root may be a string or `os.PathLike`, but it must resolve to an existing directory. `requested` must be a nonempty string containing a canonical POSIX relative path. Reject absolute paths, backslashes, NUL bytes, empty path segments, and `.` or `..` segments. Resolve existing symlinks, including symlinks in intermediate components. The final resolved path must be the root itself or a descendant according to path components, not a string-prefix check. A final target that does not yet exist is allowed, provided its resolved location remains inside the root.
+
+Return an absolute, resolved `pathlib.Path`. Raise `TypeError` for wrong public argument types and `PathAccessError` for invalid syntax, an unusable root, symlink resolution errors, or an escape attempt. The function must not create, remove, or modify filesystem entries.

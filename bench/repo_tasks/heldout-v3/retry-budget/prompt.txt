@@ -1,0 +1,17 @@
+Repair `retry_budget.py` to provide a thread-safe shared retry budget and a deterministic retry helper.
+
+Preserve `RetryBudget(capacity, initial_tokens=None)`:
+
+* `available` is a read-only integer property.
+* `try_consume() -> bool` atomically removes one token when available and returns `True`; otherwise it returns `False` without mutation.
+* `replenish(amount=1) -> int` atomically adds tokens up to `capacity` and returns the resulting available count.
+* `capacity`, an explicit `initial_tokens`, and replenishment amounts must be integers excluding booleans. Capacity and replenishment amounts are positive. Initial tokens are from 0 through capacity. Invalid values raise `ValueError` without mutation.
+
+Also preserve `retry(operation, *, budget, max_attempts, retryable=(Exception,), backoff_ns=None, sleep_ns=None)`:
+
+* The first attempt is free. Before each later attempt, consume exactly one shared budget token. If no token is available, re-raise the current operation exception unchanged.
+* Stop after `max_attempts` total calls. Non-retryable exceptions and the last allowed failure are re-raised unchanged without consuming another token.
+* `backoff_ns(retry_number)` is called before each retry, where `retry_number` starts at 1. Its result must be a nonnegative integer excluding booleans. Then call `sleep_ns(delay)` once, even for zero. When omitted, backoff returns zero and sleep is a no-op. If backoff raises or returns an invalid delay, preserve that failure and do not consume a token.
+* Return the operation's successful value, including false-valued results. A success does not automatically replenish the budget.
+
+`max_attempts` must be a positive integer excluding booleans and must be validated before calling the operation. Use no wall-clock sleeps and only the Python standard library.

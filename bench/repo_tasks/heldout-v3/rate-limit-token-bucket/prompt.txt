@@ -1,0 +1,9 @@
+Repair `token_bucket.py` to implement a thread-safe, continuously refilling token bucket using an injected monotonic clock.
+
+Keep `TokenBucket(capacity, refill_rate_per_ns, clock_ns)` and this API:
+
+* A new bucket starts full.
+* `try_acquire(amount=1) -> bool` first refills based on all elapsed nanoseconds, capped at `capacity`. It atomically consumes `amount` and returns `True` when enough tokens exist. On failure it returns `False` without consuming tokens or discarding fractional credit.
+* The read-only `available` property refills and returns the current token count.
+
+Read `clock_ns` exactly once in each `try_acquire` or `available` operation. It is supplied by the caller and must be the only source of time. Concurrent callers at one clock value must never consume more than the bucket contains. `capacity`, `refill_rate_per_ns`, and acquisition amounts must be positive finite real numbers, excluding booleans. Invalid constructor values or amounts raise `ValueError`, and an invalid acquisition must not read the clock or mutate the bucket. Use only the Python standard library and preserve fractional tokens.

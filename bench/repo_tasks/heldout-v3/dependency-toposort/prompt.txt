@@ -1,0 +1,9 @@
+Repair `dependency_order.py` by implementing `topological_order(graph)` and `DependencyCycleError`.
+
+`graph` must be a mapping from a hashable node to an iterable of hashable direct dependencies. A string or bytes object is not accepted as a dependency iterable. A node may appear only as a dependency and still belongs in the result. Duplicate dependencies for one node are ignored. Do not mutate or retain caller-owned containers. Raise `TypeError` for malformed input.
+
+Return a tuple containing every node exactly once, with every dependency before the node that requires it. Ordering must be deterministic without comparing node values. Define first-seen order as all mapping keys in iteration order, followed by previously unseen dependency nodes while scanning each key's dependency iterable in that same order. Whenever more than one node is currently eligible, choose the one with the lowest first-seen position. A node that becomes eligible may precede an already eligible node if its first-seen position is lower.
+
+On a cycle, raise `DependencyCycleError`. It exposes `cycle`, a tuple whose first and last nodes are equal and whose consecutive pairs follow dependency edges. Choose it deterministically: after removing everything possible, start at the lowest first-seen remaining node and repeatedly follow its lowest first-seen dependency that is also remaining. When a node repeats, report only the loop from its first occurrence through the repeated node. A self-dependency therefore reports `(node, node)`.
+
+The algorithm must work for thousands of nodes without recursion and must not compare or stringify nodes to determine order. Use only the Python standard library.

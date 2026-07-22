@@ -1,0 +1,7 @@
+Repair `audit_chain.py` so audit entries are canonically encoded and authenticated as an ordered chain.
+
+An entry has exactly `seq`, `prev`, `event`, and `mac`. Sequence numbers are exact nonnegative integers starting at zero. `prev` is 64 zeroes for the first entry and the exact previous entry MAC afterward. An event is a JSON object containing only string-keyed dictionaries, lists, `None`, exact bool, int, finite float, and string values. Canonical bytes are UTF-8 JSON for `{"seq": seq, "prev": prev, "event": event}` using sorted keys, separators `(',', ':')`, `ensure_ascii=False`, and `allow_nan=False`. `mac` is lowercase HMAC-SHA256 hex over those bytes.
+
+`verify_chain(entries, *, key)` validates every structure, link, sequence, and MAC using timing-safe comparison, then returns `True`. `entries` must be a non-string sequence and `key` must be nonempty exact bytes. Malformed or tampered chain data raises `AuditChainError`; wrong public container or key types raise `TypeError`.
+
+`append_event(chain, event, *, key)` requires an exact list, verifies the complete existing chain first, validates and deep-copies the event, appends one correctly authenticated entry, and returns that entry. If any validation fails, the list must remain unchanged. Later mutation of the source event must not affect the chain. Do not accept caller-supplied sequence, link, or MAC values through the event.

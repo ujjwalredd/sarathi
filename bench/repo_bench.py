@@ -300,6 +300,92 @@ def skipped_test_count(output: str) -> int:
     return max((int(value) for value in matches), default=0)
 
 
+def token_counts(usage: dict) -> tuple[int, int, int]:
+    """Return fresh input, cached input, and output counts from Codex usage."""
+    cached = int(usage.get("cached_input_tokens", 0))
+    fresh = max(int(usage.get("input_tokens", 0)) - cached, 0)
+    output = int(usage.get("output_tokens", 0))
+    return fresh, cached, output
+
+
+def estimated_api_cost(usage: dict, pricing: dict | None) -> float | None:
+    """Estimate API-equivalent cost from explicit per-million-token rates."""
+    if pricing is None:
+        return None
+    fresh, cached, output = token_counts(usage)
+    threshold = pricing.get("long_context_threshold_tokens")
+    long_context = threshold is not None and fresh + cached > threshold
+    input_multiplier = pricing.get("long_context_input_multiplier", 1.0) if long_context else 1.0
+    output_multiplier = pricing.get("long_context_output_multiplier", 1.0) if long_context else 1.0
+    return (
+        fresh * pricing["fresh_input_usd_per_million"] * input_multiplier
+        + cached * pricing["cached_input_usd_per_million"] * input_multiplier
+        + output * pricing["output_usd_per_million"] * output_multiplier
+    ) / 1_000_000
+
+
+def summarize_results(
+    results: Sequence[Result], arms: Sequence[str], pricing: dict | None
+) -> dict:
+    """Build the machine-readable result table used by reports and charts."""
+    summary = {"pricing": pricing, "arms": {}, "comparisons": {}}
+    for arm in arms:
+        valid = [item for item in results if item.arm == arm and item.status != "infrastructure-invalid"]
+        measured = [item for item in results if item.arm == arm and item.usage]
+        passed = sum(item.passed for item in valid)
+        fresh, cached, output = zip(*(token_counts(item.usage) for item in measured)) if measured else ((), (), ())
+        raw_total = sum(fresh) + sum(cached) + sum(output)
+        costs = [estimated_api_cost(item.usage, pricing) for item in measured]
+        cost_total = sum(value for value in costs if value is not None) if pricing else None
+        interval = stats.wilson(passed, len(valid)) if valid else (None, None)
+        summary["arms"][arm] = {
+            "label": ARM_LABELS.get(arm, arm),
+            "passed": passed,
+            "valid": len(valid),
+            "infrastructure_invalid": sum(
+                item.arm == arm and item.status == "infrastructure-invalid" for item in results
+            ),
+            "pass_rate": passed / len(valid) if valid else None,
+            "pass_rate_wilson_95": list(interval),
+            "mean_fresh_input_tokens": statistics.fmean(fresh) if fresh else None,
+            "mean_cached_input_tokens": statistics.fmean(cached) if cached else None,
+            "mean_output_tokens": statistics.fmean(output) if output else None,
+            "raw_tokens_per_verified_pass": raw_total / passed if passed else None,
+            "mean_duration_ms": statistics.fmean(item.duration_ms for item in measured) if measured else None,
+            "estimated_api_cost_total_usd": cost_total,
+            "estimated_api_cost_per_verified_pass_usd": cost_total / passed
+            if cost_total is not None and passed
+            else None,
+        }
+
+    sarathi = summary["arms"].get("H")
+    if sarathi and sarathi["valid"]:
+        for rival in ("A", "F", "G"):
+            other = summary["arms"].get(rival)
+            if not other or not other["valid"]:
+                continue
+            interval = stats.newcombe(
+                sarathi["passed"], sarathi["valid"], other["passed"], other["valid"]
+            )
+            comparison = {
+                "pass_rate_delta": sarathi["pass_rate"] - other["pass_rate"],
+                "pass_rate_newcombe_95": list(interval),
+                "pass_rate_significant": stats.significant(interval),
+            }
+            for field in (
+                "raw_tokens_per_verified_pass",
+                "estimated_api_cost_per_verified_pass_usd",
+                "mean_duration_ms",
+            ):
+                baseline = other[field]
+                value = sarathi[field]
+                comparison[f"{field}_delta_fraction"] = (
+                    value / baseline - 1 if value is not None and baseline else None
+                )
+            summary["comparisons"][f"H_vs_{rival}"] = comparison
+    return summary
+
+
 def grade(
     task: Task,
     workspace: Path,
@@ -518,7 +604,7 @@ def skill_isolation_preflight(root: Path, codex_env: dict[str, str]) -> dict:
     }
 
 
-def report(results: Sequence[Result], arms: Sequence[str]) -> None:
+def report(results: Sequence[Result], arms: Sequence[str], pricing: dict | None) -> None:
     print("\n  executable hidden-test results")
     print("  " + "-" * 76)
     counts: dict[str, tuple[int, int]] = {}
@@ -539,9 +625,7 @@ def report(results: Sequence[Result], arms: Sequence[str]) -> None:
         subset = [result for result in results if result.arm == arm and result.usage]
         if not subset:
             continue
-        fresh = [max(int(item.usage.get("input_tokens", 0)) - int(item.usage.get("cached_input_tokens", 0)), 0) for item in subset]
-        cached = [int(item.usage.get("cached_input_tokens", 0)) for item in subset]
-        output = [int(item.usage.get("output_tokens", 0)) for item in subset]
+        fresh, cached, output = zip(*(token_counts(item.usage) for item in subset))
         passed = sum(item.passed for item in subset)
         total = sum(a + b + c for a, b, c in zip(fresh, cached, output))
         per_pass = f"{total / passed:.0f}" if passed else "n/a"
@@ -549,6 +633,23 @@ def report(results: Sequence[Result], arms: Sequence[str]) -> None:
             f"  {arm:<5}{statistics.fmean(fresh):>12.0f}{statistics.fmean(cached):>12.0f}"
             f"{statistics.fmean(output):>12.0f}{per_pass:>14}"
         )
+
+    if pricing:
+        print("\n  estimated API-equivalent cost")
+        print("  " + "-" * 76)
+        print(f"  {'arm':<5}{'mean/call':>16}{'total':>16}{'cost/pass':>16}")
+        for arm in arms:
+            subset = [result for result in results if result.arm == arm and result.usage]
+            costs = [estimated_api_cost(item.usage, pricing) for item in subset]
+            if not costs:
+                continue
+            total = sum(value for value in costs if value is not None)
+            passed = sum(item.passed for item in subset)
+            per_pass = f"${total / passed:.4f}" if passed else "n/a"
+            print(
+                f"  {arm:<5}${statistics.fmean(costs):>15.4f}${total:>15.4f}{per_pass:>16}"
+            )
+        print(f"  source: {pricing['source']}")
 
     print("\n  Sarathi differences")
     print("  " + "-" * 76)
@@ -576,6 +677,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--grader-timeout", type=int, default=30)
     parser.add_argument("--seed", type=int, default=240517)
     parser.add_argument("--out", type=Path, default=RESULTS_ROOT)
+    parser.add_argument("--fresh-input-usd-per-million", type=float)
+    parser.add_argument("--cached-input-usd-per-million", type=float)
+    parser.add_argument("--output-usd-per-million", type=float)
+    parser.add_argument("--pricing-source")
+    parser.add_argument("--long-context-threshold-tokens", type=int)
+    parser.add_argument("--long-context-input-multiplier", type=float, default=1.0)
+    parser.add_argument("--long-context-output-multiplier", type=float, default=1.0)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--preflight-only", action="store_true")
     parser.add_argument("--yes", action="store_true")
@@ -583,6 +691,42 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if min(args.n, args.jobs, args.agent_timeout, args.grader_timeout) < 1:
         parser.error("counts and timeouts must be positive")
+    price_values = (
+        args.fresh_input_usd_per_million,
+        args.cached_input_usd_per_million,
+        args.output_usd_per_million,
+    )
+    if any(value is not None for value in price_values) != all(
+        value is not None for value in price_values
+    ):
+        parser.error("provide all three token prices or none")
+    if any(value is not None and value < 0 for value in price_values):
+        parser.error("token prices must be nonnegative")
+    if all(value is not None for value in price_values) and not args.pricing_source:
+        parser.error("--pricing-source is required with token prices")
+    if args.pricing_source and not all(value is not None for value in price_values):
+        parser.error("--pricing-source requires all three token prices")
+    if args.long_context_threshold_tokens is not None and args.long_context_threshold_tokens < 1:
+        parser.error("long-context threshold must be positive")
+    if min(args.long_context_input_multiplier, args.long_context_output_multiplier) < 1:
+        parser.error("long-context multipliers must be at least 1")
+    if args.long_context_threshold_tokens is not None and not all(
+        value is not None for value in price_values
+    ):
+        parser.error("long-context pricing requires all three token prices")
+    pricing = (
+        {
+            "fresh_input_usd_per_million": args.fresh_input_usd_per_million,
+            "cached_input_usd_per_million": args.cached_input_usd_per_million,
+            "output_usd_per_million": args.output_usd_per_million,
+            "source": args.pricing_source,
+            "long_context_threshold_tokens": args.long_context_threshold_tokens,
+            "long_context_input_multiplier": args.long_context_input_multiplier,
+            "long_context_output_multiplier": args.long_context_output_multiplier,
+        }
+        if all(value is not None for value in price_values)
+        else None
+    )
     if not shutil.which("codex"):
         parser.error("codex CLI is not installed")
 
@@ -672,6 +816,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "arms": args.arms,
         "repetitions": args.n,
         "seed": args.seed,
+        "pricing": pricing,
         "job_order": [{"arm": arm, "rep": rep, "task": task.task_id} for arm, rep, task in jobs],
         "sandbox": "Codex :workspace profile; network, repository writes, and home writes denied; temporary storage permitted",
         "sandbox_preflight": preflight,
@@ -684,7 +829,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         json.dumps([dataclasses.asdict(item) for item in results], indent=2) + "\n",
         encoding="utf-8",
     )
-    report(results, args.arms)
+    summary = summarize_results(results, args.arms, pricing)
+    (run_dir / "summary.json").write_text(
+        json.dumps(summary, indent=2, allow_nan=False) + "\n",
+        encoding="utf-8",
+    )
+    report(results, args.arms, pricing)
     print(f"\n  local artifact: {run_dir}\n")
     return 1 if metadata["infrastructure_invalid"] else 0
 

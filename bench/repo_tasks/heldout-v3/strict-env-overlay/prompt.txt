@@ -1,0 +1,11 @@
+Repair `env_overlay.py` by implementing `apply_env_overlay(base, lines)` and the public `EnvOverlayError` exception.
+
+The function builds and returns a new environment dictionary. It must never mutate `base`. `base` must be a mapping whose keys and values are strings. Environment names are limited to `[A-Za-z_][A-Za-z0-9_]*`. Invalid base data raises `TypeError` for a non-mapping or non-string key/value, and `EnvOverlayError` for an invalid name.
+
+Process `lines` in order. It must be an iterable of strings, but a single string is not a valid iterable here. Remove one trailing `\n`, and an immediately preceding `\r`, from each line. Whitespace-only lines and lines whose first non-whitespace character is `#` are ignored. All other whitespace is significant.
+
+An assignment is `NAME=VALUE`, split at the first `=`. A removal is exactly `!NAME`. Names are not trimmed. A removal of an absent name is allowed. Reject invalid names, missing `=`, NUL characters, embedded newlines, and a bare `!`. On assignment, expand the value against the environment as it exists at that point: `${NAME}` inserts an existing value and `$$` inserts one literal dollar sign. An undefined name, malformed placeholder, or any other unescaped `$` is an error. Expansion is one pass, so dollar characters inside an inserted value are not expanded again.
+
+The update is atomic from the caller's perspective. Fully validate and process into a private result, and do not return a partial result after any error. Syntax and expansion failures raise `EnvOverlayError`. It must expose zero-based `line_number` and a human-readable `reason` for line errors. Base name validation errors may use `line_number=None`; the type errors described above remain `TypeError`.
+
+Use only the Python standard library.

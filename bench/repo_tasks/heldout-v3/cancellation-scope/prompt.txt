@@ -1,0 +1,11 @@
+Repair `cancellation_scope.py` to provide race-safe hierarchical cooperative cancellation.
+
+Preserve `Cancelled`, `CancellationScope(parent=None)`, and this API:
+
+* `scope.child()` creates and returns a child scope.
+* `scope.cancel() -> bool` atomically cancels the scope and every current descendant. It returns `True` only for the call that first changes that scope to cancelled, and `False` thereafter.
+* `scope.is_cancelled` is a read-only boolean property.
+* `scope.wait(timeout=None) -> bool` has the same result convention as `threading.Event.wait`: it wakes and returns `True` when this scope is cancelled, including cancellation inherited from any ancestor.
+* `scope.checkpoint()` raises `Cancelled` when cancelled and otherwise returns `None`.
+
+Cancelling a child must not cancel its parent or siblings. A child created after its parent has been cancelled must start cancelled. Racing child creation against parent cancellation must never produce a live child of a cancelled parent. Cancellation is transitive for arbitrary nesting, idempotent, and safe when multiple threads cancel related scopes at once. Use only the standard library. Do not implement waiting with polling or wall-clock sleeps.

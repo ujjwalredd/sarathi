@@ -1,0 +1,13 @@
+Repair `money_ledger.py` by implementing `MoneyLedger`, `LedgerError`, and `UnbalancedTransaction` for an exact in-memory double-entry ledger.
+
+`MoneyLedger(scale=2)` accepts a non-boolean integer scale from 0 through 9. Amounts are converted without binary floating point. Accept only `decimal.Decimal`, integer values other than booleans, or nonempty decimal strings with no surrounding whitespace. Reject floats, non-finite values, malformed strings, and values that cannot be quantized. Quantize every posting independently to the configured scale with `ROUND_HALF_EVEN`. Normalize negative zero to positive zero.
+
+`post(entries)` accepts a non-string iterable of exactly two-item `(account, amount)` entries and consumes it once. An account is a nonempty string containing no ASCII control character. A transaction needs at least two posting lines and at least one nonzero rounded amount. The sum of the independently rounded amounts must be exactly zero. Otherwise raise `UnbalancedTransaction`, which is a `LedgerError` and exposes the quantized `difference`. Other transaction format or amount failures raise `TypeError`, `ValueError`, or `LedgerError` as appropriate.
+
+On success, update balances and append the transaction to the journal, retaining duplicate account lines and their order. Return the normalized transaction as a tuple of `(account, Decimal)` pairs. Any failure is atomic: balances, account order, and journal remain unchanged.
+
+`balance(account)` returns its quantized balance, or quantized zero for an unseen valid account. `balances()` returns a new dictionary ordered by each account's first appearance in a successful transaction. `journal` is a tuple of immutable normalized transactions. Caller mutation must not affect stored state.
+
+`reverse(index)` requires a non-boolean integer index naming an existing journal transaction, with normal nonnegative indexing only. It posts the exact negation of every original line in original order, appends that reversal to the journal, and returns it. An invalid index raises `IndexError` without changing state.
+
+Use only the Python standard library.

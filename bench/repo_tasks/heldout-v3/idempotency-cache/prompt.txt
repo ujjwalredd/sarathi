@@ -1,0 +1,11 @@
+Repair `idempotency_cache.py` so duplicate work is safely coalesced across threads.
+
+`IdempotencyCache.compute(key, function)` must behave as follows:
+
+* The first caller for an uncached key runs `function` without holding a global cache lock.
+* Concurrent callers for that same key wait for that in-flight call and receive the identical outcome. The function runs once for the group.
+* Successful return values are cached, including `None`, `False`, and other false-valued objects. Later callers receive the cached object.
+* Exceptions are never cached. All callers already waiting on that attempt receive the same exception object, and the next call may retry the function.
+* Work for different keys can run concurrently.
+
+`invalidate(key) -> bool` removes a completed cached value and reports whether one existed. It must not cancel or remove in-flight work. All shared state transitions must be thread-safe. Keys may be any hashable object and values may be any Python object. Use only the standard library and preserve the public class and method names.

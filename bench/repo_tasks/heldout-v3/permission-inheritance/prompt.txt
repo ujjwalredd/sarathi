@@ -1,0 +1,7 @@
+Fix `permissions.py` so `resolve_permissions(node_id, nodes, grants, principal_ids)` computes effective permissions for a resource hierarchy.
+
+`nodes` maps every nonempty string node ID to exactly `{"parent": <node ID or None>, "inherits": <bool>}`. Every referenced parent must exist, and the entire hierarchy must be acyclic. Starting at the requested node, include its grants, then follow parents while the current node has `inherits=True`. A node with `inherits=False` is included but stops lookup above it.
+
+`grants` maps node IDs to principal maps. Every grant node must exist. A principal map value has exactly `allow` and `deny`, each a list, tuple, set, or frozenset of permission strings. Supported permissions are `read`, `write`, `delete`, and `share`. For all requested principals, union allows and denies across the included nodes, then remove every denied permission. A deny wins regardless of which level supplied it. Return a `frozenset`.
+
+Validate the complete nodes and grants structures, including records unrelated to the requested node or principals. `node_id` and every principal ID must be nonempty strings. Reject string-like principal collections. Raise `TypeError` for wrong public container types and `PermissionPolicyError` for malformed policy data, missing IDs, or cycles. Do not mutate any input object.

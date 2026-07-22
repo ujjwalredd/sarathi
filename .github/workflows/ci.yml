@@ -31,6 +31,46 @@ jobs:
       - name: Check repo invariants
         run: python bench/validate.py
 
+  claude-plugin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install pinned Claude Code CLI
+        run: npm install --global @anthropic-ai/claude-code@2.1.206
+      - name: Validate plugin manifests
+        run: claude plugin validate .
+      - name: Smoke-test local marketplace install
+        env:
+          CLAUDE_CONFIG_DIR: ${{ runner.temp }}/claude-clean
+        run: |
+          make install
+          claude plugin details sarathi@sarathi | tee "${RUNNER_TEMP}/sarathi-plugin.txt"
+          grep -F "sarathi 0.4.0" "${RUNNER_TEMP}/sarathi-plugin.txt"
+          grep -F "Skills (1)  sarathi" "${RUNNER_TEMP}/sarathi-plugin.txt"
+
+  codex-plugin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install pinned Codex CLI
+        run: npm install --global @openai/codex@0.142.3
+      - name: Smoke-test Codex marketplace install
+        env:
+          CODEX_HOME: ${{ runner.temp }}/codex-clean
+        run: |
+          mkdir -p "${CODEX_HOME}"
+          codex plugin marketplace add . --json
+          codex plugin add sarathi@sarathi --json
+          codex plugin list --json | tee "${RUNNER_TEMP}/sarathi-codex-plugin.json"
+          grep -F '"name": "sarathi"' "${RUNNER_TEMP}/sarathi-codex-plugin.json"
+          grep -F '"version": "0.4.0"' "${RUNNER_TEMP}/sarathi-codex-plugin.json"
+
   reproducible:
     runs-on: ubuntu-latest
     steps:

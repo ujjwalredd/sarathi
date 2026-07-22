@@ -1,0 +1,9 @@
+Repair `canonical_url.py` by implementing `canonicalize_url(url)` and `CanonicalUrlError`.
+
+Accept only a string containing an absolute `http` or `https` URL with a host. Reject control characters, whitespace anywhere in the input, malformed percent escapes, user information, invalid ports, and any other scheme. Convert the scheme and host to lowercase, convert a Unicode domain to its ASCII IDNA form, remove a trailing dot from a DNS host, and keep IPv6 hosts bracketed. Remove port 80 for HTTP and port 443 for HTTPS, but preserve other ports. Discard the fragment.
+
+The path must be nonempty in the output, using `/` when absent. Resolve literal `.` and `..` path segments without letting `..` climb above the root. Preserve repeated slashes and a trailing slash. Percent escapes are normalized by decoding ASCII unreserved characters (`A-Z`, `a-z`, digits, `-._~`) and uppercasing all remaining escapes. Raw non-ASCII path characters must be UTF-8 percent encoded. A percent-encoded slash or dot is not a path separator or dot segment.
+
+Parse the query as ampersand-separated fields. A field without `=` has an empty value. Interpret `+` as a space, percent-decode each key and value as strict UTF-8, and reject malformed encoding. Drop fields whose decoded key matches `utm_source`, `utm_medium`, `utm_campaign`, `gclid`, or `fbclid`, case-insensitively. Keep duplicates and blank values. Sort remaining fields by decoded key and then decoded value using Python string ordering. Encode both sides with UTF-8 percent encoding, leaving only ASCII unreserved characters literal and using `%20`, never `+`, for spaces. Emit every retained field as `key=value`. Omit `?` if no fields remain.
+
+Use only the Python standard library. Do not perform network access or DNS resolution.

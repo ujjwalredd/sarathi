@@ -1,0 +1,7 @@
+Repair `secret_redactor.py` so `redact_secrets(value, *, sensitive_keys=..., replacement="[REDACTED]")` safely creates a redacted copy of JSON-like data.
+
+Supported values are `None`, exact bool, int, finite float, string, dictionaries with string keys, lists, and tuples. Preserve dictionary, list, and tuple container kinds. Reject unsupported objects, non-string dictionary keys, non-finite floats, and reference cycles with `TypeError` or `ValueError`. Repeated references to the same acyclic container must point to the same cloned container in the result.
+
+Sensitive key matching is case-insensitive and ignores hyphens and underscores. The default sensitive keys are `password`, `token`, `secret`, and `api_key`. Values selected by a sensitive key are replaced in full, but the entire input still must be validated as JSON-like before redaction. Dictionary keys are never renamed. `sensitive_keys` must be a non-string iterable of nonempty strings whose normalized form is nonempty, and `replacement` must be a string.
+
+The function must never mutate the source, must not leak nested content beneath a sensitive key, and must return a fully detached structure except for immutable primitive values.

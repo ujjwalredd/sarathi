@@ -1,0 +1,10 @@
+Repair `snapshot_delta_store.py` to provide a thread-safe versioned key-value store with atomic compare-and-set commits.
+
+Preserve `DELETE`, `Conflict`, `Snapshot(version, data)`, `Delta(version, changes)`, and `SnapshotDeltaStore(initial=None)`:
+
+* The initial version is 0. `snapshot()` returns a `Snapshot` containing the current version and a deep copy of all data.
+* `apply(changes, expected_version) -> int` accepts a mapping. It atomically compares `expected_version` with the current version. A mismatch raises `Conflict` without mutation. On a match, it deep-copies and applies every change as one commit, increments the version exactly once, records one delta, and returns the new version. A value identical to the exported `DELETE` sentinel removes that key if present. Empty changes still create a versioned commit.
+* If iterating or deep-copying any change fails, apply nothing, create no delta, and preserve the exact exception.
+* `deltas_since(version) -> tuple[Delta, ...]` returns deep-copied deltas with versions strictly greater than `version`, in commit order. Callers mutating any returned snapshot or delta must not affect the store or later reads.
+
+Versions must be nonnegative integers excluding booleans and cannot exceed the current version. Invalid versions raise `ValueError`. `Conflict` is used only for a valid but stale `expected_version`. Concurrent calls using the same expected version must have at most one successful commit. Use only the Python standard library.

@@ -1,0 +1,9 @@
+Repair `interval_set.py` by completing the immutable `IntervalSet` type.
+
+An interval is a pair `(start, end)` of integers representing the half-open set `start <= x < end`. Boolean values do not count as integers. The constructor accepts any iterable of interval pairs. Reject malformed pairs and non-integer endpoints with `TypeError`; reject `start >= end` with `ValueError`. A single string or bytes object is not a valid interval iterable.
+
+Normalize by sorting intervals and merging every overlap or adjacency. Expose the normalized result through an `intervals` property as a tuple of pairs. The object must not retain or mutate caller-owned containers.
+
+Implement `union(other)`, `intersection(other)`, and `difference(other)`. These return new `IntervalSet` instances and require `other` to be an `IntervalSet`, otherwise raise `TypeError`. Neither operand may change. Difference means points in `self` that are not in `other` and may split an interval. Also implement `contains_point(point)`, requiring a non-boolean integer, and `total_length`, an integer property. `len(instance)` is the number of normalized intervals, iteration yields the normalized pairs, and equality compares normalized intervals only with another `IntervalSet`.
+
+Use only the Python standard library. Do not expand intervals into individual points because endpoints may be extremely far apart.

@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "registered_at_utc": "2026-07-22T01:55:33Z",
+  "suite": "heldout-v3",
+  "task_suite_frozen_at_utc": "2026-07-22T02:34:37Z",
+  "task_suite_sha256": "2b6afb78bcc1de8095e5a65618aafa46b2c6dc00f4a60d640d61e2882eab7516",
+  "task_suite_files": 90,
+  "task_suite_bytes": 180665,
+  "task_suite_audit": "Independent implementations passed all 208 test methods. Eleven concurrency-sensitive suites passed 50 repeated runs each with zero failures.",
+  "task_count": 30,
+  "repetitions": 3,
+  "total_calls": 360,
+  "seed": 260721,
+  "jobs": 3,
+  "model": "gpt-5.5",
+  "model_note": "The dated gpt-5.5-2026-04-23 snapshot was tested before scoring but is unsupported with Codex ChatGPT authentication, so this run uses the gpt-5.5 alias.",
+  "effort": "medium",
+  "pilot": {
+    "purpose": "Infrastructure check only. Model outcomes cannot change the runner, arms, prompts, tests, or final sample.",
+    "task_ids": [
+      "circuit-breaker-clock",
+      "json-patch-atomic",
+      "lease-registry",
+      "ordered-worker-pool",
+      "path-access-policy",
+      "semantic-version-range",
+      "signed-cookie-rotation",
+      "strict-env-overlay"
+    ],
+    "repetitions": 1,
+    "total_calls": 32
+  },
+  "arms": {
+    "A": {
+      "label": "control",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "F": {
+      "label": "Caveman",
+      "revision": "0d95a81d35a9f2d123a5e9430d1cfc43d55f1bb0",
+      "sha256": "ef4861fb1e362c7f56870f51e486b36551068d7357f98d1b1ec9fa04fc250c41",
+      "bytes": 4774
+    },
+    "G": {
+      "label": "Ponytail",
+      "revision": "16f29800fd2681bdf24f3eb4ccffe38be3baec6b",
+      "sha256": "4e7382857d47d796bd20454c6d10318293fd3724efef6cc1e90cdf589e765e24",
+      "bytes": 5700
+    },
+    "H": {
+      "label": "Sarathi 0.4.0",
+      "sha256": "e1359c99cb3e6bf552a58831f2f8756ccba34c16f5318d026835f2b273ceda10",
+      "bytes": 2048
+    }
+  },
+  "runner_sha256": "8f3d17460099b384ee364f72deadbfda2b1d652cc49136a36f087b33ffa334ca",
+  "pricing": {
+    "kind": "api_equivalent_estimate",
+    "fresh_input_usd_per_million": 5.0,
+    "cached_input_usd_per_million": 0.5,
+    "output_usd_per_million": 30.0,
+    "source": "https://developers.openai.com/api/docs/models/gpt-5.5",
+    "note": "This standard-rate API-equivalent estimate is not a Codex subscription bill. Codex reports aggregate session usage, so the estimate does not apply the per-prompt long-context surcharge."
+  },
+  "amendments": [
+    {
+      "recorded_at_utc": "2026-07-22T02:29:01Z",
+      "before_model_scoring": true,
+      "change": "Removed automatic long-context multipliers from the declared run.",
+      "reason": "The official rule keys the surcharge to a prompt above 272K input tokens, while Codex exposes only aggregate session usage. Applying the threshold to an aggregate could overstate cost."
+    },
+    {
+      "recorded_at_utc": "2026-07-22T02:56:54Z",
+      "after_pilot_before_final_scoring": true,
+      "change": "Treat a null optional long-context threshold as disabled in cost summarization and add a regression test.",
+      "reason": "The 32-call infrastructure pilot completed grading but crashed during summary generation when the omitted threshold was represented as null. No arm, task, prompt, grader, score, or model setting changed."
+    }
+  ],
+  "primary_metrics": [
+    "hidden_test_pass_rate",
+    "estimated_api_cost_per_verified_pass"
+  ],
+  "secondary_metrics": [
+    "raw_tokens_per_verified_pass",
+    "mean_duration_ms",
+    "mean_fresh_input_tokens",
+    "mean_cached_input_tokens",
+    "mean_output_tokens"
+  ],
+  "victory_gate": {
+    "accuracy": "Sarathi pass rate is at least every other arm's pass rate.",
+    "cost": "Sarathi estimated API cost per verified pass is at least 10 percent below every other arm.",
+    "noninferiority": "The lower 95 percent interval for each Sarathi pass-rate difference is above -0.05.",
+    "infrastructure": "No arm has an infrastructure-invalid result."
+  },
+  "integrity_rules": [
+    "Sarathi and competitor arms were frozen before task authoring.",
+    "Fresh task authors must not inspect any arm, earlier task suite, or benchmark result.",
+    "Independent reference implementations must pass every hidden assertion before model scoring.",
+    "The pilot may detect infrastructure defects only. Outcome-driven prompt, test, skill, or runner edits invalidate the final run.",
+    "Task prompts and hidden tests become public only after final scoring.",
+    "Skipped tests are infrastructure-invalid, never passes.",
+    "All raw outputs and candidate snapshots remain in ignored local artifacts."
+  ]
+}

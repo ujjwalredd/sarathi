@@ -1,0 +1,7 @@
+Repair `body_limits.py` so `read_request_body(stream, *, content_length, max_bytes, chunk_size=8192)` reads an untrusted request body without unbounded allocation or over-reading.
+
+`stream` must expose callable `read(size)`. `max_bytes` must be a nonnegative integer and `chunk_size` a positive integer; bool is invalid for both. `content_length` is either `None` or a canonical nonnegative decimal string with no sign, whitespace, or leading zeros except `0`. An invalid header raises `BodyReadError`. A declared length over the cap raises `BodyLimitError` before any read.
+
+With a declared length, read exactly that many bytes and never probe beyond it, because following bytes may belong to another request. Raise `BodyReadError` on premature EOF. With no declared length, read at most `max_bytes + 1` bytes in total so an oversized body can be detected, and raise `BodyLimitError` instead of truncating. Every call must supply a positive integer size no larger than `chunk_size` and no larger than the remaining bytes needed for the current decision.
+
+Each `read` result must be exact bytes, must not exceed the requested size, and may be shorter than requested. Reject an invalid stream or invalid public numeric types with `TypeError`, and invalid numeric ranges with `ValueError`. Return the complete bytes on success. Never call unbounded `read()` and never silently discard or include bytes outside the request body.

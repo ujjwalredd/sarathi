@@ -1,0 +1,7 @@
+Fix `webhook_replay.py` so `verify_and_record(body, timestamp, signature, secret, *, now, tolerance, seen)` authenticates a webhook and atomically records replay state.
+
+`body` and nonempty `secret` must be exact bytes. `timestamp` must be a canonical nonnegative decimal string with no sign or leading zeros except `0`. `signature` must be exactly `v1=` followed by 64 lowercase hexadecimal characters. The expected digest is HMAC-SHA256 over `timestamp.encode("ascii") + b"." + body`. Compare digests using a timing-safe operation.
+
+`now` and `tolerance` must be nonnegative integers but not bools. Accept timestamps only when `abs(now - int(timestamp)) <= tolerance`. `seen` is a mutable mapping from a digest hex string to its integer expiry. Validate all existing entries. On a valid request, remove entries whose expiry is strictly less than `now`, reject a digest still present with `ReplayError`, otherwise store its expiry as `int(timestamp) + tolerance` and return `True`.
+
+Malformed, unauthenticated, stale, or future requests raise `WebhookError`. Wrong public argument types raise `TypeError`, and invalid ranges raise `ValueError`. Invalid requests and invalid replay state must leave `seen` unchanged. Replay detection and insertion occur only after every validation and authentication check succeeds.

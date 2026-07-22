@@ -1,0 +1,10 @@
+Repair `circuit_breaker.py` to implement a thread-safe circuit breaker driven only by its injected monotonic clock.
+
+Preserve `CircuitOpen` and `CircuitBreaker(failure_threshold, recovery_timeout_ns, clock_ns)`. `call(function)` has these rules:
+
+* The breaker starts `closed`. In that state it calls the function. A success resets the consecutive failure count. An exception increments it and is re-raised unchanged. Reaching `failure_threshold` moves the breaker to `open` at the clock value observed after that failure.
+* While open and before `recovery_timeout_ns` has elapsed, `call` raises `CircuitOpen` without invoking the function.
+* At the exact recovery deadline, one caller may run as the single `half_open` probe. Concurrent callers must get `CircuitOpen` while that probe is running.
+* A successful probe closes the breaker and resets failures. A failed probe reopens it, starts a fresh timeout from the clock value observed after the failure, and re-raises the original exception.
+
+The read-only `state` property must return `"closed"`, `"open"`, or `"half_open"`. State decisions must be atomic across threads, but user functions must not run while the state lock is held. Both numeric constructor arguments must be positive integers and invalid values raise `ValueError`. Use only the standard library. Do not consult wall-clock time or sleep inside the breaker.

@@ -1,0 +1,11 @@
+Repair `semver_range.py` by implementing immutable `Version` and `Range` types plus `satisfies(version, expression)`.
+
+`Version.parse(text)` accepts only a string in strict Semantic Versioning form `MAJOR.MINOR.PATCH`, optionally followed by `-PRERELEASE` and `+BUILD`. Core numbers are decimal, nonnegative, and have no leading zero unless zero. Prerelease and build identifiers are nonempty dot-separated ASCII alphanumerics or hyphens. Numeric prerelease identifiers also forbid leading zeros. Expose `major`, `minor`, `patch`, `prerelease`, and `build`; the last two are tuples of strings. Ordering follows SemVer 2.0.0: build metadata has no precedence, a release is greater than its prereleases, numeric prerelease identifiers compare numerically and below nonnumeric identifiers, and otherwise identifiers compare lexically. Equality and hashing are precedence equality, so build metadata is ignored.
+
+`Range.parse(expression)` accepts a nonempty string. `||` separates OR arms, and whitespace-separated tokens inside an arm are ANDed. Empty arms are invalid. Supported tokens are a full bare version or `=VERSION`, the comparators `<`, `<=`, `>`, and `>=` with a full version, wildcard tokens `*`, `MAJOR.x`, and `MAJOR.MINOR.x` where `x` or `X` is accepted, and `^VERSION` or `~VERSION`.
+
+Wildcards cover the corresponding release line. Tilde means at least the given version and below the next minor release. Caret means compatible updates: below the next major if major is nonzero, otherwise below the next minor if minor is nonzero, otherwise below the next patch. Bounds use SemVer precedence. Invalid versions, unsupported syntax, and malformed ranges raise `ValueError`; non-string inputs raise `TypeError`.
+
+`range.contains(version)` accepts a `Version` or version string. `satisfies(version, expression)` is equivalent to `Range.parse(expression).contains(version)`. Apply the usual prerelease gate separately to each OR arm: a prerelease can match an arm only if that arm contains at least one full-version token with a prerelease and the same major, minor, and patch. `*` therefore does not accept prereleases by itself.
+
+Use only the Python standard library.

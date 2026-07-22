@@ -1,0 +1,11 @@
+Repair `structured_redaction.py` by implementing `redact_record`, `RedactionError`, and `DEFAULT_SENSITIVE_KEYS`.
+
+`redact_record(record, *, sensitive_keys=DEFAULT_SENSITIVE_KEYS, replacement="[REDACTED]", max_depth=32)` returns a new redacted structure. Supported non-sensitive input values are dictionaries with string keys, lists, tuples, strings, finite integers or floats, booleans, and `None`. Preserve lists and tuples as their respective types and convert dictionary subclasses to ordinary dictionaries. Never mutate or retain a mutable container from the input.
+
+The defaults cover `password`, `passwd`, `secret`, `token`, `access_token`, `refresh_token`, `api_key`, `authorization`, `cookie`, and `set-cookie`. Key matching is case-insensitive and ignores ASCII hyphens and underscores, so `API_KEY`, `Api-Key`, and `apikey` match. `sensitive_keys` must be a non-string iterable of nonempty strings. The same normalization applies to custom keys. `replacement` must be a string.
+
+When a dictionary key is sensitive, replace its entire value immediately. Do not inspect, copy, validate, or traverse that value. This is required so even an unsupported object or a cyclic structure can be safely hidden when it is stored beneath a sensitive key. Strings in non-sensitive fields are left unchanged; this function performs structural redaction, not free-text pattern matching.
+
+Reject unsupported non-sensitive values, non-string dictionary keys, cycles on the active traversal path, and containers nested deeper than `max_depth` by raising `RedactionError`. Shared acyclic containers are allowed and should be copied independently. `max_depth` is a non-boolean nonnegative integer; the root container is depth 0, its directly nested containers are depth 1, and scalar values do not consume depth. `RedactionError` exposes a JSON Pointer-like `path` and `reason`; escape `~` as `~0` and `/` as `~1` in dictionary path components. Use the empty string for the root.
+
+Use only the Python standard library.

@@ -9,33 +9,34 @@ Seek the lowest-cost verified success. Solve the real task, not its proxy.
 
 ## Execute
 
-1. Extract the acceptance conditions. Keep them mental for a clear, self-contained task. Include
-   boundaries or silent invariants only when the contract needs them. `own-task`
-2. Inspect the source of truth before relying on an assumption. Never invent files, state, or test
-   results. `not-sole-cause`
-3. Make the smallest root-cause fix. Preserve safeguards. Avoid adjacent refactors, new
-   dependencies, and speculative abstractions. `action-not-fruit`
-4. Run the cheapest decisive check, then inspect the diff. For an explicit API contract, cover its
-   boundary, error, and state metadata. Run broader checks only when the change can affect them.
-   Add rollback, concurrency, or security checks only when that risk exists. `skill-in-action`
-5. Stop after the acceptance conditions pass. Claim only what the evidence proves.
+1. Extract acceptance conditions. Keep them mental when the task is clear. Record type, order,
+   precedence, boundary, or silent invariants only when the contract depends on them. `own-task`
+2. Inspect the source of truth before assuming. Never invent files, state, or test results.
+   `not-sole-cause`
+3. Make the smallest root-cause fix. Preserve safeguards. Avoid adjacent refactors, dependencies,
+   and speculative abstractions. `action-not-fruit`
+4. Run the cheapest decisive check; inspect the diff. For typed or versioned input, validate its
+   outer type and discriminator before dependent structure. For an explicit contract, cover
+   boundary, error, order, and state metadata. Broaden only to affected scope. Add rollback,
+   concurrency, or security checks only when that risk exists. `skill-in-action`
+5. Stop when the acceptance conditions pass. Claim only what the evidence proves.
 
-Do not narrate a plan, restate the request, or keep checking after a decisive pass. Spend more
-effort only on security, payment, data, production, and irreversible work. `effort-budget`
+Do not narrate plans, restate the request, or check again after a decisive pass. Spend extra effort
+only on security, payment, data, production, and irreversible work. `effort-budget`
 
-After two failed attempts, stop repeating. State the evidence, challenge one assumption, switch
+After two failures, stop repeating. State the evidence, challenge one assumption, switch
 hypotheses, and run one bounded check. `drift-cascade`
 
-If required evidence is unavailable, name it and mark the likely direction unverified. Give one
-recommendation with its decisive tradeoff; the user owns the choice. `release-the-decision`
+If evidence is unavailable, name it and mark the likely direction unverified. Give one
+recommendation and its decisive tradeoff; the user owns the choice. `release-the-decision`
 
 ## Respond
 
-- Simple answer: direct result, normally within 60 words.
-- Completed code task: outcome, decisive check, and remaining risk, normally within 100 words.
-- Missing-workspace answer: needed evidence and next check. Do not invent implementation code.
-- High-risk warning: use enough detail to prevent harm. Never hide a failed check or uncertainty.
+- Simple answer: direct result, normally under 60 words.
+- Completed code: outcome, decisive check, and remaining risk, normally under 100 words.
+- Missing workspace: needed evidence and next check. Do not invent code.
+- High risk: use enough detail to prevent harm. Never hide failure or uncertainty.
 
-References are engineering mnemonics, not religious interpretation. Read
-`references/anchors.json` only when an exact cue, verse, or literal meaning is needed; never quote
-from memory. This skill provides no spiritual, medical, legal, or financial advice.
+References are engineering mnemonics, not religious interpretation. Read `references/anchors.json`
+only for an exact cue, verse, or literal meaning; never quote from memory. No spiritual, medical,
+legal, or financial advice.

@@ -1,0 +1,11 @@
+Repair `event_journal.py` to implement a thread-safe append-only event journal with atomic batches and stable replay.
+
+Preserve `DuplicateEvent`, `JournalEvent(sequence, event_id, payload)`, and `EventJournal`:
+
+* `append(event_id, payload) -> JournalEvent` appends one event. Event IDs must be unique for the lifetime of the journal. A duplicate raises `DuplicateEvent` without mutation.
+* `append_batch(entries) -> tuple[JournalEvent, ...]` accepts a finite iterable of `(event_id, payload)` pairs. It appends the whole batch atomically, or nothing if an ID duplicates an existing event, occurs twice in the batch, or iterating the input raises. An empty batch returns `()`.
+* Successful events receive unique contiguous integer sequences starting at 1. Concurrent append and batch operations are ordered by the point at which each atomic commit acquires the journal lock.
+* `snapshot() -> tuple[JournalEvent, ...]` returns an immutable snapshot in sequence order.
+* `replay(apply, after_sequence=0) -> int` captures one stable snapshot, then calls `apply(event)` outside the journal lock for matching events in sequence order. It returns the number applied. Events appended by a handler are not part of that replay. If a handler raises, stop immediately and re-raise the exact exception.
+
+`after_sequence` must be a nonnegative integer excluding booleans. Invalid values raise `ValueError` without calling the handler. IDs are hashable and payloads are arbitrary objects. Use only the Python standard library.

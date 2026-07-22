@@ -1,0 +1,11 @@
+Repair `ordered_worker_pool.py` so `ordered_map(function, iterable, max_workers)` runs work concurrently while returning results in input order.
+
+Required behavior:
+
+* Return a list containing one function result for each input item in the original input order. Completion order, duplicate inputs, and unorderable results must not affect the output order.
+* Run no more than `max_workers` function calls at once, while allowing up to that many calls to overlap. Each input is submitted exactly once.
+* If a worker raises, re-raise that exact exception object from `ordered_map`. Do not convert it to a result or replace its type.
+* Accept any finite iterable, including a one-shot generator, and return `[]` for an empty iterable.
+* `max_workers` must be a positive integer excluding booleans. Raise `ValueError` before consuming the iterable when it is invalid.
+
+The function must not leave worker threads running after it returns or raises. Use only the Python standard library and do not change the public function signature.

@@ -1,0 +1,11 @@
+Repair `csv_projection.py` by implementing `Column`, `CsvProjectionError`, and `read_projected_csv(text, columns, *, extra="reject")`.
+
+`text` must be a string containing CSV data. Parse it with the standard library CSV rules, including quoted commas and embedded newlines, in strict mode. The first record is the header. An empty input, duplicate header name, malformed CSV, or data record whose field count differs from the header is a `CsvProjectionError`.
+
+`columns` is a non-string iterable of `Column` objects. `Column(name, converter=str, required=True, default=...)` has a nonempty string name, a callable converter, and a boolean `required` flag. Reject an invalid column definition with `TypeError` or `ValueError`, and reject duplicate schema names with `CsvProjectionError`. A header required by the schema must exist. A column with an explicit default is allowed to be absent regardless of `required`; a missing column with `required=False` and no explicit default produces `None`.
+
+`extra` is either `"reject"` or `"ignore"`. In reject mode, a header not named in the schema is an error. In ignore mode, extra input fields are not returned. Output is a list of ordinary dictionaries, one per data record, whose key insertion order is schema order. For a present column, pass the raw string to its converter, including an empty string. Defaults are already output values and must not be converted.
+
+Schema, header, row-shape, CSV parse, and conversion failures must raise `CsvProjectionError`. It exposes `row_number`, `column`, and `reason`. Record numbers are one-based with the header as record 1. Use `row_number=None` for errors not tied to a record and `column=None` when no single column applies. Preserve the original exception as `__cause__` for converter failures. Do not return partial rows after any failure.
+
+Use only the Python standard library.

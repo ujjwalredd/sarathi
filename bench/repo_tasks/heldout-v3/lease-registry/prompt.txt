@@ -1,0 +1,12 @@
+Repair `lease_registry.py` so it provides a thread-safe in-memory lease registry.
+
+Keep the public class `LeaseRegistry(clock_ns)` and these methods:
+
+* `acquire(key, owner, ttl_ns) -> bool` acquires an absent or expired key and returns `True`. It returns `False` without changing an active lease.
+* `renew(key, owner, ttl_ns) -> bool` extends an active lease only when `owner` still owns it. A failed renewal changes nothing.
+* `release(key, owner) -> bool` removes an active lease only for its owner.
+* `holder(key) -> object | None` returns the active owner, or `None` for an absent or expired lease.
+
+`clock_ns` is a zero-argument monotonic nanosecond clock supplied by the caller. Read it once per public operation. A lease is expired when `clock_ns() >= expires_at`. `ttl_ns` must be a positive integer; otherwise `acquire` and `renew` must raise `ValueError` without mutation. All decisions and mutations for one operation must be atomic across threads, including acquisition of the same expired key. Keys and owners may be any hashable objects.
+
+Use only the Python standard library and do not change the public API.

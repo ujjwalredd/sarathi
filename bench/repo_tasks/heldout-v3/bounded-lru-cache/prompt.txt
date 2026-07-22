@@ -1,0 +1,11 @@
+Repair `lru_cache.py` by implementing the generic `LRUCache` class.
+
+`LRUCache(capacity, on_evict=None)` requires a positive integer capacity, with booleans rejected. `on_evict`, when supplied, must be callable. Keys may be any hashable object and values may be any object, including `None`.
+
+The cache is least-recently-used. `put(key, value)` inserts or replaces a value and marks that key most recent. Replacing an existing key is not an eviction. If insertion exceeds capacity, evict the least recent entry. `get(key, default)` returns and refreshes an existing value. If absent, return `default` without changing order. When `default` is omitted, an absent key raises `KeyError`. `delete(key)` removes and returns a value without treating it as an eviction, or raises `KeyError`. `keys()` returns an immutable tuple ordered least recent to most recent. `len(cache)` returns the current count.
+
+`resize(capacity)` applies the same capacity validation, changes the bound, and evicts as many least recent entries as necessary. `clear()` removes all entries. For capacity, resize, and clear evictions, invoke `on_evict(key, value, reason)` with reason `"capacity"`, `"resize"`, or `"clear"`. Multiple callbacks use least-recent to most-recent order.
+
+All state operations must be safe when called concurrently from threads. Callbacks must run after the corresponding mutation and without the cache lock held, so a callback may safely call cache methods. If a callback raises, propagate its exception, but keep the already-completed cache mutation. For a multi-entry resize or clear, all entries are removed before the first callback.
+
+Use only the Python standard library.

@@ -1,0 +1,13 @@
+Repair `json_patch.py` by implementing `apply_patch(document, operations)` and `PatchError` for an atomic subset of RFC 6902 that includes all six standard operations.
+
+`document` and all inserted values must be acyclic JSON-compatible data: dictionaries with string keys, lists, strings, finite integers or floats, booleans, or `None`. Reject unsupported values with `TypeError`. Boolean and numeric values are distinct for the `test` operation, so `True` does not test equal to `1`.
+
+`operations` must be a non-string iterable of dictionaries. Each operation needs string fields `op` and `path`. Supported `op` values are `add`, `remove`, `replace`, `move`, `copy`, and `test`. `add`, `replace`, and `test` require `value`; `move` and `copy` require a string `from`. Unknown operations and missing or mistyped fields are errors.
+
+Paths use JSON Pointer. The empty string addresses the root. Nonempty pointers start with `/`; decode `~0` as `~` and `~1` as `/`, rejecting every other tilde escape. For arrays, indices are canonical nonnegative decimal strings with no leading zero, except `0`. `-` is allowed only as the final `add` destination and appends. An array add inserts before an existing index and also permits an index equal to the current length. Object add creates or replaces a member. Remove and replace require an existing target.
+
+`add` or `replace` at the root replaces the whole document. `remove` at the root yields JSON null (`None`). `test` may target the root. `copy` deep-copies its source. `move` removes the source and then adds it at the destination, so an array destination is interpreted after removal. Moving a path to itself is a no-op after verifying it exists. Moving a value into one of its own descendants is invalid.
+
+Return a deep-copied patched document and never mutate the caller's document or operation values. If any operation fails, raise `PatchError` and leave all caller-owned inputs unchanged. `PatchError` exposes the zero-based `index`, the operation name when available through `operation`, and a human-readable `reason`. Preserve no partial result.
+
+Use only the Python standard library.

@@ -1,0 +1,5 @@
+Implement a strict HTTP-style comma list parser in `header_lists.py`.
+
+`parse_header_list(value, *, max_items=32, max_item_length=256)` returns a list of decoded strings. An item is either a nonempty RFC 9110 token, or a quoted string. Tokens use ASCII letters, digits, the punctuation characters `! # $ % & ' * + - . ^ _ | ~`, and the backtick character. Optional whitespace is only space or tab and is allowed before and after items and commas. Inside a quoted string, allow space, tab, and printable ASCII except unescaped quote or backslash. A backslash may escape only a quote or another backslash. Commas inside quotes are data. The empty quoted string is valid.
+
+Reject an empty list, empty elements, invalid token characters, non-ASCII text, control characters, unterminated quotes, trailing junk, and invalid escapes with `HeaderListError`. Limits apply to the decoded item count and decoded item length. `value` must be a string. Both limits must be positive integers and bool is not an integer for this API. Raise `TypeError` or `ValueError` for invalid public argument types or limits. Parsing must be deterministic and must not silently discard input.

@@ -1,0 +1,7 @@
+Repair `archive_manifest.py` to validate an untrusted archive manifest before extraction.
+
+`validate_manifest(entries, *, max_files, max_total_size)` must return an immutable tuple of frozen `ArchiveEntry(path, type, size, sha256)` values. Each input entry must be a mapping with exactly the keys `path`, `type`, `size`, and `sha256`. Supported types are `file` and `dir`; links and other types are forbidden. Paths use canonical POSIX syntax: they must be nonempty relative strings with no leading slash, backslash, NUL, empty segment, `.` segment, or `..` segment. Duplicate paths are forbidden. A file may not be an ancestor of another entry, regardless of input order.
+
+For a file, size must be a nonnegative integer but not bool, and sha256 must be exactly 64 lowercase hexadecimal characters. For a directory, size must be exactly integer zero and sha256 must be `None`. `max_files` is a nonnegative integer cap on all manifest entries and `max_total_size` is a nonnegative integer cap on the sum of file sizes. Bools are invalid limits. Stop consuming as soon as the entry cap is exceeded so an unbounded iterable cannot force unbounded work.
+
+Raise `TypeError` for wrong public container or limit types and `ManifestError` for malformed entries or exceeded limits. Do not mutate the input mappings or retain mutable input objects in the returned values.

@@ -1,0 +1,11 @@
+Repair `transactional_outbox.py` to provide an atomic in-memory state transaction with an ordered outbox.
+
+Keep `TransactionalOutbox`, `OutboxEvent`, and the following API:
+
+* `store.transaction()` returns a context manager. Inside it, `tx.set(key, value)` stages a state assignment and `tx.enqueue(topic, payload)` stages an outbox event.
+* Leaving the context normally commits all staged state assignments and events as one atomic operation. Leaving because of an exception commits nothing and propagates that exception. A transaction object cannot be used after its context exits.
+* Committed events receive unique, contiguous integer `sequence` values starting at 1. Their order is transaction commit order, then enqueue order within each transaction.
+* `store.snapshot()` atomically returns `(state_copy, pending_events_tuple)`. Events are `OutboxEvent(sequence, topic, payload)` instances. Mutating the returned state dictionary must not mutate the store.
+* `store.drain(handler, limit=None) -> int` calls `handler(event)` on pending events in sequence order. An event is removed only after its handler returns successfully. If a handler raises, preserve that exact exception and leave the failed event and all later events pending. Only one drain may deliver at a time, and handlers must run without the state lock held. Events committed during a drain are eligible for that drain unless its limit has been reached.
+
+`limit` must be `None` or a nonnegative integer; invalid values raise `ValueError` without delivery. Empty commits are allowed. All state must be safe under concurrent commits, snapshots, and drains. Use only the Python standard library.

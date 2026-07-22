@@ -1,0 +1,32 @@
+{
+  "name": "sarathi",
+  "version": "0.4.0",
+  "description": "A compact discipline for scoped, verified, and concise coding-agent work.",
+  "author": {
+    "name": "Sarathi contributors",
+    "url": "https://github.com/ujjwalredd/sarathi"
+  },
+  "homepage": "https://github.com/ujjwalredd/sarathi#readme",
+  "repository": "https://github.com/ujjwalredd/sarathi",
+  "license": "MIT",
+  "keywords": [
+    "reasoning",
+    "token-efficiency",
+    "agent-reliability",
+    "benchmark"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Sarathi",
+    "shortDescription": "Verified discipline for coding agents",
+    "longDescription": "Keep coding-agent work scoped, evidence-based, risk-aware, and concise.",
+    "developerName": "Sarathi contributors",
+    "category": "Developer Tools",
+    "capabilities": [],
+    "websiteURL": "https://github.com/ujjwalredd/sarathi",
+    "defaultPrompt": [
+      "Use Sarathi to make this change and verify it.",
+      "Use Sarathi to diagnose this failure without guessing."
+    ]
+  }
+}

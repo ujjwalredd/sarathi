@@ -6,6 +6,12 @@ PY ?= python3
 JOBS ?= 4
 N ?= 1
 SUITE ?= heldout-v2
+MODEL ?= gpt-5.5
+EFFORT ?= medium
+FRESH_INPUT_USD_M ?= 5
+CACHED_INPUT_USD_M ?= 0.5
+OUTPUT_USD_M ?= 30
+PRICING_SOURCE ?= https://developers.openai.com/api/docs/models/gpt-5.5
 
 help:
 	@echo "sarathi make targets"
@@ -31,7 +37,7 @@ help:
 	@echo "  uninstall   remove it"
 	@echo "  clean       remove __pycache__ and local run artifacts"
 	@echo ""
-	@echo "  vars: N=$(N) JOBS=$(JOBS) SUITE=$(SUITE) PY=$(PY)"
+	@echo "  vars: N=$(N) JOBS=$(JOBS) SUITE=$(SUITE) MODEL=$(MODEL) EFFORT=$(EFFORT) PY=$(PY)"
 
 build:
 	@test -f /tmp/gita_verse.json || curl -sL -o /tmp/gita_verse.json \
@@ -68,7 +74,12 @@ compare-codex:
 		--tasks reasoning minimalism --n $(N) --jobs $(JOBS)
 
 repo-bench:
-	$(PY) bench/repo_bench.py --suite $(SUITE) --arms A F G H --n $(N) --jobs 1
+	$(PY) bench/repo_bench.py --suite $(SUITE) --arms A F G H --n $(N) --jobs $(JOBS) \
+		--model $(MODEL) --effort $(EFFORT) \
+		--fresh-input-usd-per-million $(FRESH_INPUT_USD_M) \
+		--cached-input-usd-per-million $(CACHED_INPUT_USD_M) \
+		--output-usd-per-million $(OUTPUT_USD_M) \
+		--pricing-source $(PRICING_SOURCE)
 
 codex-baseline:
 	$(PY) bench/codex_skill.py --condition baseline --expect-skill absent --n $(N) --jobs $(JOBS)

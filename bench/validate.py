@@ -41,8 +41,11 @@ def check_json_parses() -> list[str]:
     targets = [
         ROOT / ".claude-plugin/plugin.json",
         ROOT / ".claude-plugin/marketplace.json",
+        ROOT / ".codex-plugin/plugin.json",
+        ROOT / ".agents/plugins/marketplace.json",
         _anchors_path(),
         ROOT / "bench/vendor/provenance.json",
+        ROOT / "bench/preregistration-v3.json",
     ]
     targets += sorted((ROOT / "bench/tasks").glob("*.json"))
     for path in targets:
@@ -326,13 +329,22 @@ def check_product_and_competitor_arms() -> list[str]:
 
 
 def check_plugin_packaging() -> list[str]:
-    """Keep Claude, marketplace, citation, and Codex metadata synchronized."""
+    """Keep Claude, Codex, marketplace, citation, and skill metadata synchronized."""
     errors = []
     plugin_path = ROOT / ".claude-plugin/plugin.json"
     marketplace_path = ROOT / ".claude-plugin/marketplace.json"
+    codex_plugin_path = ROOT / ".codex-plugin/plugin.json"
+    codex_marketplace_path = ROOT / ".agents/plugins/marketplace.json"
     citation_path = ROOT / "CITATION.cff"
     codex_path = ROOT / "skills/sarathi/agents/openai.yaml"
-    for path in (plugin_path, marketplace_path, citation_path, codex_path):
+    for path in (
+        plugin_path,
+        marketplace_path,
+        codex_plugin_path,
+        codex_marketplace_path,
+        citation_path,
+        codex_path,
+    ):
         if not path.is_file():
             errors.append(f"{path.relative_to(ROOT)}: missing")
     if errors:
@@ -340,6 +352,8 @@ def check_plugin_packaging() -> list[str]:
 
     plugin = json.loads(plugin_path.read_text(encoding="utf-8"))
     marketplace = json.loads(marketplace_path.read_text(encoding="utf-8"))
+    codex_plugin = json.loads(codex_plugin_path.read_text(encoding="utf-8"))
+    codex_marketplace = json.loads(codex_marketplace_path.read_text(encoding="utf-8"))
     entries = marketplace.get("plugins", [])
     if len(entries) != 1:
         errors.append("marketplace must contain exactly one Sarathi plugin entry")
@@ -354,6 +368,13 @@ def check_plugin_packaging() -> list[str]:
         errors.append(f"plugin versions disagree: {sorted(str(v) for v in versions)}")
     if plugin.get("name") != "sarathi" or entry.get("name") != "sarathi":
         errors.append("Claude plugin and marketplace names must both be sarathi")
+    if codex_plugin.get("name") != "sarathi" or codex_plugin.get("version") != plugin.get("version"):
+        errors.append("Codex plugin name and version must match the Claude plugin")
+    codex_entries = codex_marketplace.get("plugins", [])
+    if len(codex_entries) != 1 or codex_entries[0].get("name") != "sarathi":
+        errors.append("Codex marketplace must contain exactly one Sarathi entry")
+    elif codex_entries[0].get("source") != {"source": "local", "path": "./"}:
+        errors.append("Codex marketplace must load the plugin from this repository root")
 
     citation = citation_path.read_text(encoding="utf-8")
     version = plugin.get("version")
@@ -369,7 +390,7 @@ def check_plugin_packaging() -> list[str]:
 def check_repository_task_suites() -> list[str]:
     """Keep the frozen forward-test suite complete."""
     errors = []
-    expected_counts = {"heldout-v2": 8}
+    expected_counts = {"heldout-v2": 8, "heldout-v3": 30}
     for suite, expected_count in expected_counts.items():
         suite_root = ROOT / "bench/repo_tasks" / suite
         if not suite_root.is_dir():
@@ -384,6 +405,18 @@ def check_repository_task_suites() -> list[str]:
             prompt = task_dir / "prompt.txt"
             starter = task_dir / "starter"
             hidden = task_dir / "hidden_test.py"
+            source_files = {
+                path.relative_to(task_dir).as_posix()
+                for path in task_dir.rglob("*")
+                if path.is_file()
+            }
+            starter_names = sorted(path.name for path in starter.glob("*.py")) if starter.is_dir() else []
+            expected_files = {"prompt.txt", "hidden_test.py"}
+            expected_files.update(f"starter/{name}" for name in starter_names)
+            if len(starter_names) != 1 or source_files != expected_files:
+                errors.append(
+                    f"{task_dir.relative_to(ROOT)}: expected prompt, hidden test, and one starter module"
+                )
             if not prompt.is_file() or not prompt.read_text(encoding="utf-8").strip():
                 errors.append(f"{task_dir.relative_to(ROOT)}: missing or empty prompt.txt")
             starter_files = sorted(starter.rglob("*.py")) if starter.is_dir() else []
@@ -396,6 +429,85 @@ def check_repository_task_suites() -> list[str]:
                     compile(path.read_text(encoding="utf-8"), str(path), "exec")
                 except SyntaxError as exc:
                     errors.append(f"{path.relative_to(ROOT)}: {exc}")
+    return errors
+
+
+def check_v3_preregistration() -> list[str]:
+    """Keep the v3 runner, arms, task count, and declared sample size frozen."""
+    path = ROOT / "bench/preregistration-v3.json"
+    if not path.is_file():
+        return ["bench/preregistration-v3.json: missing"]
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        return [f"bench/preregistration-v3.json: {exc}"]
+
+    errors = []
+    runner = ROOT / "bench/repo_bench.py"
+    if runner.is_file() and hashlib.sha256(runner.read_bytes()).hexdigest() != data.get("runner_sha256"):
+        errors.append("v3 preregistration: runner hash changed")
+
+    try:
+        arms = build_arms.build_all()
+    except (RuntimeError, SystemExit) as exc:
+        return errors + [f"v3 preregistration: cannot build arms: {exc}"]
+    for name, declared in data.get("arms", {}).items():
+        actual = arms.get(name)
+        if actual is None:
+            errors.append(f"v3 preregistration: arm {name} is missing")
+            continue
+        encoded = actual.encode("utf-8")
+        if hashlib.sha256(encoded).hexdigest() != declared.get("sha256"):
+            errors.append(f"v3 preregistration: arm {name} hash changed")
+        if len(encoded) != declared.get("bytes"):
+            errors.append(f"v3 preregistration: arm {name} size changed")
+
+    suite = data.get("suite")
+    suite_root = ROOT / "bench/repo_tasks" / str(suite)
+    if suite_root.is_dir():
+        task_files = sorted(path for path in suite_root.rglob("*") if path.is_file())
+        count = sum(path.is_dir() for path in suite_root.iterdir())
+        if count != data.get("task_count"):
+            errors.append(
+                f"v3 preregistration: suite has {count} tasks, expected {data.get('task_count')}"
+            )
+        digest = hashlib.sha256()
+        for task_file in task_files:
+            relative = task_file.relative_to(suite_root).as_posix().encode("utf-8")
+            content = task_file.read_bytes()
+            digest.update(len(relative).to_bytes(4, "big"))
+            digest.update(relative)
+            digest.update(len(content).to_bytes(8, "big"))
+            digest.update(content)
+        if digest.hexdigest() != data.get("task_suite_sha256"):
+            errors.append("v3 preregistration: audited task suite hash changed")
+        if len(task_files) != data.get("task_suite_files"):
+            errors.append("v3 preregistration: audited task suite file count changed")
+        if sum(task_file.stat().st_size for task_file in task_files) != data.get("task_suite_bytes"):
+            errors.append("v3 preregistration: audited task suite byte count changed")
+    elif data.get("task_count"):
+        errors.append(f"v3 preregistration: suite {suite!r} is missing")
+
+    expected_calls = (
+        int(data.get("task_count", 0))
+        * int(data.get("repetitions", 0))
+        * len(data.get("arms", {}))
+    )
+    if data.get("total_calls") != expected_calls:
+        errors.append(
+            f"v3 preregistration: total_calls is {data.get('total_calls')}, expected {expected_calls}"
+        )
+
+    pilot = data.get("pilot", {})
+    pilot_ids = pilot.get("task_ids", [])
+    available_ids = {path.name for path in suite_root.iterdir() if path.is_dir()} if suite_root.is_dir() else set()
+    if len(pilot_ids) != len(set(pilot_ids)) or not set(pilot_ids) <= available_ids:
+        errors.append("v3 preregistration: pilot task ids are duplicated or unknown")
+    pilot_calls = len(pilot_ids) * int(pilot.get("repetitions", 0)) * len(data.get("arms", {}))
+    if pilot.get("total_calls") != pilot_calls:
+        errors.append(
+            f"v3 preregistration: pilot total_calls is {pilot.get('total_calls')}, expected {pilot_calls}"
+        )
     return errors
 
 
@@ -432,6 +544,7 @@ CHECKS = [
     ("product and competitor arms are pinned", check_product_and_competitor_arms),
     ("plugin packaging is synchronized", check_plugin_packaging),
     ("repository task suites are complete", check_repository_task_suites),
+    ("v3 benchmark is preregistered", check_v3_preregistration),
     ("README local links resolve", check_readme_local_links),
 ]
 

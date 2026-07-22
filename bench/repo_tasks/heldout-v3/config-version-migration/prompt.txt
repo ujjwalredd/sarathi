@@ -1,0 +1,11 @@
+Implement strict configuration migration in `config_migration.py`.
+
+`migrate_config(config)` accepts one of three exact schemas and returns a new version 3 dictionary:
+
+* Version 1 has exactly `version`, `endpoint`, `timeout_seconds`, and `api_key`. It becomes version 3 with `timeout_ms = timeout_seconds * 1000`, bearer auth using `api_key`, and `max_attempts = 3`.
+* Version 2 has exactly `version`, `service`, `token`, and `max_retries`. Its service has exactly `url` and `timeout_ms`. It becomes bearer auth using `token`, and `max_attempts = max_retries + 1`.
+* Version 3 has exactly `version`, `service`, `auth`, and `retry`. Service has exactly `url` and `timeout_ms`; auth has exactly `scheme` and `token`; retry has exactly `max_attempts`. Validate it and return a detached copy.
+
+The output is exactly `{"version": 3, "service": {"url": ..., "timeout_ms": ...}, "auth": {"scheme": "bearer", "token": ...}, "retry": {"max_attempts": ...}}`. Version and numeric fields must be exact integers, not bools. Timeouts must be 1 through 300000 milliseconds after conversion. Retry attempts must be 1 through 10. Tokens must be nonempty strings. The auth scheme must be exactly `bearer`.
+
+Service URLs must be strings parsed as absolute HTTPS URLs with a hostname and without username, password, or fragment. Preserve a valid URL string exactly. Reject unknown fields, missing fields, unsupported versions, malformed nested objects, and out-of-range values with `ConfigError`. A non-mapping top-level argument raises `TypeError`. Never mutate or return any mutable object from the input.
