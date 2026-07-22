@@ -46,6 +46,7 @@ def check_json_parses() -> list[str]:
         _anchors_path(),
         ROOT / "bench/vendor/provenance.json",
         ROOT / "bench/preregistration-v3.json",
+        ROOT / "bench/preregistration-agentic-gpt.json",
     ]
     targets += sorted((ROOT / "bench/tasks").glob("*.json"))
     for path in targets:
@@ -452,6 +453,8 @@ def check_v3_preregistration() -> list[str]:
     except (RuntimeError, SystemExit) as exc:
         return errors + [f"v3 preregistration: cannot build arms: {exc}"]
     for name, declared in data.get("arms", {}).items():
+        if name == "H":
+            continue
         actual = arms.get(name)
         if actual is None:
             errors.append(f"v3 preregistration: arm {name} is missing")
@@ -511,6 +514,53 @@ def check_v3_preregistration() -> list[str]:
     return errors
 
 
+def check_agentic_gpt_preregistration() -> list[str]:
+    """Keep the refrozen GPT adapter, current arms, and 304-cell design synchronized."""
+    path = ROOT / "bench/preregistration-agentic-gpt.json"
+    if not path.is_file():
+        return ["bench/preregistration-agentic-gpt.json: missing"]
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        return [f"bench/preregistration-agentic-gpt.json: {exc}"]
+
+    errors = []
+    adapter = data.get("adapter", {})
+    runner = ROOT / str(adapter.get("path", ""))
+    if not runner.is_file():
+        errors.append("agentic GPT preregistration: adapter is missing")
+    else:
+        if hashlib.sha256(runner.read_bytes()).hexdigest() != adapter.get("run_gpt_py_sha256"):
+            errors.append("agentic GPT preregistration: adapter hash changed")
+        try:
+            compile(runner.read_text(encoding="utf-8"), str(runner), "exec")
+        except SyntaxError as exc:
+            errors.append(f"agentic GPT preregistration: adapter syntax error: {exc}")
+
+    try:
+        arms = build_arms.build_all()
+    except (RuntimeError, SystemExit) as exc:
+        return errors + [f"agentic GPT preregistration: cannot build arms: {exc}"]
+    names = {"baseline": "A", "caveman": "F", "ponytail": "G", "sarathi": "H"}
+    for label, arm_name in names.items():
+        declared = data.get("arms", {}).get(label, {})
+        encoded = arms.get(arm_name, "").encode("utf-8")
+        expected_hash = declared.get("body_sha256") if label == "sarathi" else declared.get("sha256")
+        expected_bytes = declared.get("body_bytes") if label == "sarathi" else declared.get("bytes")
+        if hashlib.sha256(encoded).hexdigest() != expected_hash:
+            errors.append(f"agentic GPT preregistration: {label} arm hash changed")
+        if len(encoded) != expected_bytes:
+            errors.append(f"agentic GPT preregistration: {label} arm size changed")
+
+    task_count = len(data.get("feature_tasks", [])) + len(data.get("safety_tasks", []))
+    expected_cells = task_count * int(data.get("arm_count", 0)) * int(data.get("repetitions", 0))
+    if task_count != data.get("task_count") or expected_cells != data.get("total_cells"):
+        errors.append("agentic GPT preregistration: task or cell count is inconsistent")
+    if data.get("engine", {}).get("workers") != 35:
+        errors.append("agentic GPT preregistration: worker count changed")
+    return errors
+
+
 def check_readme_local_links() -> list[str]:
     """Require every repository-relative README link and image to exist."""
     readme = ROOT / "README.md"
@@ -545,6 +595,7 @@ CHECKS = [
     ("plugin packaging is synchronized", check_plugin_packaging),
     ("repository task suites are complete", check_repository_task_suites),
     ("v3 benchmark is preregistered", check_v3_preregistration),
+    ("agentic GPT benchmark is preregistered", check_agentic_gpt_preregistration),
     ("README local links resolve", check_readme_local_links),
 ]
 

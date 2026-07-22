@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "registered_at_utc": "2026-07-22T15:18:57Z",
+  "purpose": "Provider-port of Ponytail's current 304-cell agentic benchmark to Codex GPT-5.5.",
+  "development_disclosure": "Sarathi was redesigned after seeing earlier Claude results on these public tasks. This run tests whether the frozen redesign transfers to GPT-5.5. It is not a blind holdout.",
+  "upstream": {
+    "repository": "https://github.com/DietrichGebert/ponytail",
+    "revision": "16f29800fd2681bdf24f3eb4ccffe38be3baec6b",
+    "run_py_sha256": "88c105299b38850c6d944a11faac7b0e18de2f5c9a3e5f4ae1f6b641d6853811",
+    "tasks_py_sha256": "68f473557695f69a036cd6fdb5d8e9ec51aef407183416545b29823c1e3190a2"
+  },
+  "adapter": {
+    "path": "bench/agentic_gpt_runner.py",
+    "run_gpt_py_sha256": "dacd05fe5e61a4e6cc19976c0d12601dcfd38a488363f23a89bd633b0c10a40f",
+    "changes": [
+      "Use isolated Codex exec sessions instead of Claude Code sessions.",
+      "Prepend each skill body to the same task prompt and disable installed plugins and user rules.",
+      "Read token usage from Codex JSONL and estimate API-equivalent cost from published token prices.",
+      "Keep Ponytail's workspaces, tasks, scorers, LOC accounting, timeouts, checkpointing, and aggregation code.",
+      "Abort and tree-kill active cells after three infrastructure failures instead of spending through a broken run.",
+      "Forbid project execution and package-manager checks because Ponytail's Claude harness disables Bash."
+    ]
+  },
+  "fixture": {
+    "repository": "https://github.com/fastapi/full-stack-fastapi-template",
+    "revision": "cd83fc10ca20393e9ee50e3005e170c6929e047e"
+  },
+  "engine": {
+    "cli": "codex-cli 0.142.3",
+    "model": "gpt-5.5",
+    "reasoning_effort": "medium",
+    "workers": 35,
+    "cell_timeout_seconds": 300
+  },
+  "arms": {
+    "baseline": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "caveman": {
+      "revision": "0d95a81d35a9f2d123a5e9430d1cfc43d55f1bb0",
+      "bytes": 4774,
+      "sha256": "ef4861fb1e362c7f56870f51e486b36551068d7357f98d1b1ec9fa04fc250c41"
+    },
+    "ponytail": {
+      "revision": "16f29800fd2681bdf24f3eb4ccffe38be3baec6b",
+      "bytes": 5700,
+      "sha256": "4e7382857d47d796bd20454c6d10318293fd3724efef6cc1e90cdf589e765e24"
+    },
+    "sarathi": {
+      "version": "0.5.0",
+      "source_bytes": 2882,
+      "source_sha256": "be79ada182ef233e6ae8a5647495317d9481e430e1b077dea9894d5d535b5b5d",
+      "body_bytes": 2530,
+      "body_sha256": "417627ff103af5dfb98cb2ac94c0d0042498914afb168d0bc35c7228937357fd"
+    }
+  },
+  "feature_tasks": [
+    "tmpl-fe-datepicker",
+    "tmpl-fe-colorpicker",
+    "tmpl-fe-command",
+    "tmpl-fe-dropzone",
+    "tmpl-fe-wizard",
+    "tmpl-fe-rating",
+    "tmpl-be-duplicate",
+    "tmpl-be-search",
+    "tmpl-be-count",
+    "tmpl-be-archive",
+    "tmpl-be-bulkdelete",
+    "tmpl-be-csv"
+  ],
+  "safety_tasks": [
+    "safe-path",
+    "critic-email",
+    "rate-limit",
+    "sql-user",
+    "auth-token",
+    "csv-sum",
+    "cache"
+  ],
+  "repetitions": 4,
+  "task_count": 19,
+  "arm_count": 4,
+  "total_cells": 304,
+  "metrics": {
+    "feature": [
+      "mean git-diff added source LOC",
+      "mean total tokens",
+      "mean API-equivalent cost",
+      "mean wall time"
+    ],
+    "safety": [
+      "deterministic correctness rate",
+      "deterministic adversarial safety rate"
+    ],
+    "feature_correctness_limit": "The upstream feature tier treats any non-empty source diff as correct. LOC must not be read as proof of feature completeness."
+  },
+  "pricing": {
+    "fresh_input_usd_per_million": 5.0,
+    "cached_input_usd_per_million": 0.5,
+    "output_usd_per_million": 30.0,
+    "source": "https://developers.openai.com/api/docs/models/gpt-5.5",
+    "kind": "API-equivalent estimate, not the user's Codex subscription bill",
+    "long_context_multiplier": "not applied because Codex reports aggregate session usage rather than the size of each individual prompt"
+  },
+  "victory_gate": {
+    "infrastructure": "All 304 cells have a zero Codex return code, a final agent message, and token usage.",
+    "safety": "Sarathi matches or exceeds Ponytail on both correctness and safety across the 28 safety cells per arm.",
+    "efficiency": "Sarathi is lower than Ponytail on feature-tier mean LOC, total tokens, API-equivalent cost, and wall time."
+  },
+  "invalid_attempts": [
+    {
+      "started_at_utc": "2026-07-22T15:09:29Z",
+      "workers": 35,
+      "status": "infrastructure-invalid and excluded",
+      "started_cells": 177,
+      "completed_model_cells": 41,
+      "spend_cap_failures": 135,
+      "terminated_cells": 1,
+      "error": "You hit your spend cap set by the owner of your workspace. Ask an owner to increase your spend cap to continue.",
+      "notes": "No metric or comparison was computed. Partial cells are unbalanced across tasks and arms. The final skill was shortened from 2951 to 2530 body bytes using the user's pre-run Claude analysis, not partial GPT outcomes. The adapter gained fail-fast process cleanup and a stricter no-execution prompt before refreezing."
+    }
+  ],
+  "integrity_rules": [
+    "Do not change the skill, arms, tasks, adapter, model, reasoning effort, repetition count, or metrics after the scored run starts.",
+    "A missing final message, usage record, nonzero return code, timeout, or scorer exception is infrastructure-invalid, never a candidate failure.",
+    "Raw workspaces and model output remain local and ignored. Only the protocol, aggregate result, chart, and honest limitations are tracked."
+  ]
+}

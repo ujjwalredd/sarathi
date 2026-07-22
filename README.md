@@ -6,7 +6,7 @@
 
 <p lang="sa"><strong>योगः कर्मसु कौशलम्</strong></p>
 
-<p><em>“Yoga is skill in action.”</em><br>
+<p><em>"Yoga is skill in action."</em><br>
 <sub><a href="https://github.com/gita/gita">Bhagavad Gita 2.50</a></sub></p>
 
 <p><strong>Plan carefully, then carry that care into execution.</strong></p>
@@ -19,10 +19,10 @@ Most coding agents can write code. The hard part is getting them to be honest ab
 the real files instead of guessing, fix the actual bug instead of hiding it, slow down when the
 work is risky, and run the one check that proves the change works.
 
-Sarathi is a small set of instructions for exactly that. It is not a framework and it is not a
-program you run. It adds nothing to your project. It is 2,077 bytes of plain guidance that tells an
-agent one thing: find the cheapest way to a verified result, stop once the evidence is clear, and
-say so plainly when the evidence is missing.
+Sarathi is a small set of instructions for exactly that. It is not a framework or a program you
+run. It adds nothing to your project. The instruction body loaded into an agent is 2,530 bytes. It
+asks the agent to find the cheapest verified solution, stop when the evidence is clear, and say
+plainly when the evidence is missing.
 
 ## When it helps
 
@@ -53,7 +53,10 @@ cd sarathi
 make install
 ```
 
-The current plugin version is `0.3.0`.
+The current plugin version is `0.5.0`.
+
+The marketplace passes Claude Code's strict validator and installs from a clean local
+configuration on Claude Code 2.1.206. That check does not make a model call.
 
 If Claude Code is already open, reload its plugins:
 
@@ -73,7 +76,7 @@ To check the installed version:
 claude plugin details sarathi@sarathi
 ```
 
-It should show version `0.3.0` and `Skills (1) sarathi`.
+It should show version `0.5.0` and `Skills (1) sarathi`.
 
 ## Why the Bhagavad Gita?
 
@@ -92,17 +95,15 @@ from memory. The exact verses, plain-language summaries, and sources are in
 public-domain [`gita/gita`](https://github.com/gita/gita) project. Sarathi claims no religious
 authority.
 
-## What a real-agent benchmark showed
+## What the agentic benchmark has shown
 
-The honest way to measure a skill is to watch a real agent do real work. So I borrowed Ponytail's
-own agentic harness and added Sarathi as an arm. Every run is a headless Claude Code session
-(Haiku 4.5) editing tiangolo's [full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template),
-scored on the `git diff` it leaves behind. Twelve feature tickets for the size test, six adversarial
-tickets for the safety test, the same agent with and without each skill, n=4.
+The chart below is a historical result for Sarathi 0.4.0. It used Ponytail's agentic harness with
+Claude Haiku 4.5: 12 feature tickets, six adversarial safety tickets, four arms, and four runs per
+cell. Every cell got an isolated workspace and the skills were injected the same way.
 
 ![Every metric vs the no-skill baseline: sarathi is leaner than baseline on LOC, tokens, cost and time; ponytail cuts the most code; caveman rises above 100%.](assets/benchmark-agentic.svg)
 
-Each arm as a percent of the no-skill baseline (lower is leaner, cheaper, faster):
+Each arm as a percent of the no-skill baseline. Lower is leaner, cheaper, or faster.
 
 | vs no-skill baseline | LOC | tokens | cost | time | safe |
 |---|--:|--:|--:|--:|--:|
@@ -110,17 +111,33 @@ Each arm as a percent of the no-skill baseline (lower is leaner, cheaper, faster
 | ponytail | -41% | +1% | -2% | -9% | 100% |
 | caveman | +13% | +33% | +24% | +25% | 96% |
 
-Sarathi beats the no-skill baseline on every metric and never bloats. It has the lowest raw cost
-and token use of any arm here, and it buries caveman, which is worse than doing nothing on all four
-metrics. But it does not win. Ponytail cuts far more code, because deleting lines is the one thing
-it is built to do. And Sarathi is not perfect on safety: on the six adversarial tickets it scored
-23 of 24, missing once when its `csv-sum` code crashed on a malformed row instead of handling it.
-That is a real miss, so it is reported as one. Baseline and Ponytail held 100%.
+Sarathi 0.4.0 beat the no-skill baseline on the four efficiency metrics and used fewer tokens and
+less money than the other skill arms in this run. It still did not win. Ponytail cut much more
+code, and Sarathi missed one `csv-sum` safety case by crashing on a malformed row. Baseline and
+Ponytail held 100% safety.
 
-Fairness note: all three skills are injected identically as always-on system prompts, and the
-baseline gets none, so any difference is the skill's effect. Six safety tickets are a floor, not a
-proof of security, and n=4 is small. The result stands on its own: leaner than nothing, far better
-than caveman, behind Ponytail on code and one guard short of a clean safety sweep.
+This chart does not measure the current 0.5.0 skill. That version is shorter and more concrete than
+the larger experimental prompt that regressed on date and color picker tasks. It names the native
+HTML controls directly and keeps the safety rule that rejects invalid state before mutation.
+
+### Current 304-cell GPT-5.5 run
+
+The current comparison is frozen in
+[`bench/preregistration-agentic-gpt.json`](bench/preregistration-agentic-gpt.json). It ports
+Ponytail's 19-task harness to isolated Codex `gpt-5.5` sessions and runs 12 feature tasks plus seven
+safety tasks across baseline, Caveman, Ponytail, and Sarathi. Four repetitions produce 304 cells,
+with up to 35 cells running at once.
+
+There is no valid result yet. The first full attempt on July 22, 2026 hit the Codex workspace
+owner's spend cap. It started 177 cells, but only 41 model cells completed before spend-cap errors
+made the run invalid. Those partial cells are unbalanced across tasks and arms, so none of their
+metrics appear here. The runner now stops after three infrastructure failures and terminates only
+the active benchmark process groups.
+
+This is a provider port, not an exact reproduction of the Claude result. The tasks, scorers,
+workspaces, LOC accounting, repetitions, and arms stay fixed. The runner changes from Claude Code
+to Codex, reads usage from Codex JSONL, and reports an API-equivalent GPT-5.5 cost estimate. That
+estimate is not a Codex subscription bill.
 
 ## An earlier check on Codex
 
@@ -140,7 +157,7 @@ there:
 |---|---:|---:|---:|
 | No skill | **8/8** | 0 bytes | **129,148** |
 | Ponytail | **8/8** | 5,700 bytes | 202,511 |
-| Sarathi | 7/8 | **2,077 bytes** | 172,581 |
+| Sarathi 0.4.0 | 7/8 | **2,077 bytes** | 172,581 |
 | Caveman | 7/8 | 4,774 bytes | 175,631 |
 
 Sarathi tied Caveman and spent 1.7% fewer tokens per solved task. It was 14.8% leaner than
@@ -155,7 +172,7 @@ One more honest caveat: 32 runs is not enough to call a winner. Once you account
 sample is, none of these differences are real yet in the statistical sense. And "tokens per solved
 task" is a rough cost proxy, not a dollar figure, because this run did not report money.
 
-## How I kept it fair
+## How the earlier Codex check was kept fair
 
 - Sarathi was locked before the tasks were written, so it could not be tuned to them.
 - The other two skills use the exact published text, pinned to a commit. Hashes are in
@@ -177,7 +194,7 @@ Free checks:
 make check
 ```
 
-Current result: 80 unit tests and 14 repository invariants pass.
+The command runs the unit suite and repository invariants without model calls.
 
 Preview the scored matrix without model calls:
 
@@ -190,7 +207,7 @@ python bench/repo_bench.py \
   --dry-run
 ```
 
-Run it:
+Run the repository repair benchmark:
 
 ```bash
 make repo-bench N=1
@@ -200,13 +217,44 @@ Model calls can consume quota. The runner records the model, CLI and Python vers
 hashes, task hashes, skill hash, token usage, outputs, and confidence intervals in local ignored
 artifacts.
 
+To reproduce the frozen 304-cell agentic GPT run, use Ponytail and the FastAPI template at the
+commits recorded in the preregistration:
+
+```bash
+SARATHI_REPO="$PWD"
+git clone https://github.com/DietrichGebert/ponytail.git /tmp/ponytail-agentic
+git -C /tmp/ponytail-agentic checkout 16f29800fd2681bdf24f3eb4ccffe38be3baec6b
+git clone https://github.com/fastapi/full-stack-fastapi-template.git /tmp/fastapi-template
+git -C /tmp/fastapi-template checkout cd83fc10ca20393e9ee50e3005e170c6929e047e
+python3 bench/build_arms.py
+cp bench/agentic_gpt_runner.py /tmp/ponytail-agentic/benchmarks/agentic/run_gpt.py
+```
+
+First prove that Ponytail's deterministic scorers work. This makes no model calls.
+
+```bash
+SARATHI_ARM_DIR="$SARATHI_REPO/bench/arms" \
+PONYTAIL_TMPL=/tmp/fastapi-template \
+python3 /tmp/ponytail-agentic/benchmarks/agentic/run_gpt.py --selftest
+```
+
+Then run all 304 cells. This can consume substantial quota.
+
+```bash
+SARATHI_ARM_DIR="$SARATHI_REPO/bench/arms" \
+PONYTAIL_TMPL=/tmp/fastapi-template \
+python3 /tmp/ponytail-agentic/benchmarks/agentic/run_gpt.py \
+  --task tmpl-fe-datepicker,tmpl-fe-colorpicker,tmpl-fe-command,tmpl-fe-dropzone,tmpl-fe-wizard,tmpl-fe-rating,tmpl-be-duplicate,tmpl-be-search,tmpl-be-count,tmpl-be-archive,tmpl-be-bulkdelete,tmpl-be-csv,safe-path,critic-email,rate-limit,sql-user,auth-token,csv-sum,cache \
+  --arms baseline,caveman,ponytail,sarathi \
+  --models gpt-5.5 --runs 4 --workers 35
+```
+
 ## What would count as a real win
 
-A real win needs a bigger test, planned in advance, with each task run several times. Sarathi would
-have to match everyone on correctness, clearly cost less per solved task, and hold that lead even
-after you account for luck. Until then, the honest summary is simple: on this run Sarathi was
-smaller and leaner than the two other skills and tied Caveman on correctness, but Ponytail and the
-no-skill agent still did better.
+For this run, a win means all 304 cells are valid, Sarathi matches or beats Ponytail on both safety
+scores, and Sarathi is lower on feature LOC, total tokens, API-equivalent cost, and wall time. If
+one of those conditions fails, it is not a sweep. Since the current run did not complete, Sarathi
+0.5.0 has not earned that claim.
 
 ## Repository map
 

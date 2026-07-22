@@ -1,9 +1,10 @@
 # Third-party notices
 
-Sarathi vendors exact skill text from these projects for reproducible benchmarking:
+Sarathi vendors exact skill text and a modified benchmark runner from these projects for
+reproducible benchmarking:
 
 - Caveman, copyright (c) 2026 Julius Brussee
-- Ponytail, copyright (c) 2026 DietrichGebert
+- Ponytail skill text and agentic runner, copyright (c) 2026 DietrichGebert
 
 Both are provided under the MIT License:
 
